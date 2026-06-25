@@ -1,0 +1,24 @@
+[
+  {
+    "symbol": "600519",
+    "name": "贵州茅台",
+    "cost_price": 1500.00,
+    "current_price": 1520.00,
+    "quantity": 100,
+    "buy_date": "2026-06-01",
+    "reason": "消费龙头，业绩稳定",
+    "pnl_pct": 1.33,
+    "hold_days": 23
+  },
+  {
+    "symbol": "300308",
+    "name": "中际旭创",
+    "cost_price": 180.00,
+    "current_price": 175.00,
+    "quantity": 200,
+    "buy_date": "2026-06-10",
+    "reason": "AI算力龙头",
+    "pnl_pct": -2.78,
+    "hold_days": 14
+  }
+]

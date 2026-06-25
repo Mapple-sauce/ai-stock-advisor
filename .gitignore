@@ -9,8 +9,8 @@ venv/
 # 环境变量 (含 API Key)
 .env
 
-# 数据文件 (持仓, 缓存等)
-data/portfolio.json
+# 本地数据文件
+data/portfolio.local.json
 
 # IDE
 .vscode/

@@ -166,6 +166,72 @@ def add_holding():
     print(f"✅ 已添加持仓: {h['name']} ({h['symbol']}) 成本 {h['cost_price']} 数量 {h['quantity']}")
 
 
+def run_backtest_mode():
+    """回测验证 (方案一): 单日期回测"""
+    from backtest.engine import run_backtest
+
+    symbols = settings.stock_list or settings.watch_list
+    if not symbols:
+        print("⚠️ 未配置 STOCK_LIST")
+        return
+
+    import datetime
+    as_of = (datetime.date.today() - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+    if len(sys.argv) > 2:
+        as_of = sys.argv[2]
+
+    print("\n" + "█" * 60)
+    print(f"  🧪 方案一: AI 分析回测验证")
+    print(f"  📅 回测日期: {as_of}  |  持有天数: 20")
+    print(f"  📊 测试 {len(symbols)} 只股票")
+    print("█" * 60)
+
+    result = run_backtest(symbols, as_of_date=as_of, hold_days=20)
+    summary = result["summary"]
+    buy_avg = summary.get("buy_avg_return", 0)
+    avoid_avg = summary.get("avoid_avg_return", 0)
+    diff = buy_avg - avoid_avg
+    print(f"  🟢 推荐买入平均: {buy_avg:+.2f}% vs 回避平均: {avoid_avg:+.2f}% (差: {diff:+.2f}%)")
+    print(f"  {'✅ 模型有效' if diff > 0 else '❌ 模型待优化'}")
+
+
+def run_backtest_multi():
+    """多日期综合回测"""
+    from backtest.engine import run_multi_backtest
+
+    symbols = settings.stock_list or settings.watch_list
+    if not symbols:
+        print("⚠️ 未配置 STOCK_LIST")
+        return
+
+    import datetime
+    dates = []
+    today = datetime.date.today()
+    for m in range(1, 6):
+        d = today.replace(day=1) - datetime.timedelta(days=m * 30)
+        dates.append(d.strftime("%Y-%m-%d"))
+
+    print("\n" + "█" * 60)
+    print(f"  🧪 方案一: 多日期综合回测")
+    print(f"  📅 {len(dates)} 个时间点 x {len(symbols)} 只股票")
+    print("█" * 60)
+
+    result = run_multi_backtest(symbols, dates, hold_days=20)
+    summary = result["summary"]
+    buy_avg = summary.get("buy_avg_return", 0)
+    avoid_avg = summary.get("avoid_avg_return", 0)
+    diff = buy_avg - avoid_avg
+    accuracy = summary.get("accuracy_pct", 0)
+
+    print(f"\n  🏆 模型综合评估:")
+    if accuracy > 55 and diff > 2:
+        print(f"  🟢 有参考价值 (正确率{accuracy}%, 多空差{diff:+.2f}%)")
+    elif accuracy > 50 and diff > 0:
+        print(f"  🟡 略有参考价值 (正确率{accuracy}%, 多空差{diff:+.2f}%)")
+    else:
+        print(f"  🔴 需优化 (正确率{accuracy}%, 多空差{diff:+.2f}%)")
+
+
 def list_holdings():
     """查看持仓"""
     pm = PortfolioManager()
@@ -204,6 +270,9 @@ def main():
         "追高": lambda: run_scan_with_mode("momentum"),
         "hunt": run_hunter,
         "挖掘": run_hunter,
+        "backtest": run_backtest_mode,
+        "bt": run_backtest_mode,
+        "btmulti": run_backtest_multi,
         "add": add_holding,
         "添加": add_holding,
         "list": list_holdings,
@@ -223,6 +292,8 @@ def main():
         print("  hunt      低位挖掘 (AI深度分析) 💎 推荐")
         print("  buy       买入分析")
         print("  sell      卖出分析")
+        print("  backtest  回测验证 (方案一)")
+        print("  btmulti   多日期综合回测")
 
 
 if __name__ == "__main__":

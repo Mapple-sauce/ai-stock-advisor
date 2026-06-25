@@ -454,13 +454,16 @@ def _compute_score(s: dict, ind: dict, mode: str) -> tuple[float, list[str]]:
             weighted_score += weight * fscore * 100
             total_weight += weight
 
-    # 归一化到 0-100
+    # 归一化到 0-100 并反转
+    # 基于回测验证: 当前市况下因子是反指标
+    # 低分=强(买入), 高分=弱(回避)
     if total_weight > 0:
-        final_score = (weighted_score / total_weight) + 50
+        raw = (weighted_score / total_weight) + 50
     else:
-        final_score = 50
+        raw = 50
 
-    final_score = max(0, min(100, final_score))
+    # 反转: 100 → 0, 0 → 100
+    final_score = 100 - max(0, min(100, raw))
 
     # 过滤无用信号
     signals = [s for s in signals if s and s not in ("KDJ中性", "布林位置中性", "中性")]

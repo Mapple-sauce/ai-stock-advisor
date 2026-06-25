@@ -198,14 +198,31 @@ class Orchestrator:
     #  市场扫描流程
     # ──────────────────────────────────────────────
 
-    def scan_market(self, candidates: list[dict]) -> str:
+    def scan_market(self, candidates: list[dict], mode: str = "top_gainers") -> str:
         """AI 扫描精选"""
         top_n = 5
+
+        # 根据模式调整描述
+        mode_labels = {
+            "low_position": "💎 低位潜力股",
+            "momentum": "🔥 追高跟强",
+            "top_gainers": "📈 今日涨幅榜",
+        }
+        mode_label = mode_labels.get(mode, "📈 扫描")
+
         text = "\n".join(
-            f"- {s['code']} {s['name']} 涨幅:{s.get('change_pct', 0)}% 成交:{s.get('turnover', 0)}"
+            f"- {s.get('name','')}({s['code']}) 涨幅:{s.get('change_pct',0)}% "
+            f"评分:{s.get('score','?')} RSI:{s.get('rsi','?')} "
+            f"信号:{','.join(s.get('signals',[]))}"
             for s in candidates[:15]
         )
-        prompt = f"今日候选股票:\n{text}\n\n请精选最值得关注的 {top_n} 只股票。"
+
+        prompt = (
+            f"## 扫描模式: {mode_label}\n\n"
+            f"### 候选股票\n{text}\n\n"
+            f"请从以上候选股票中精选最值得关注的 {top_n} 只, "
+            f"结合每个股票的技术评分和信号给出理由。"
+        )
         report = market_scanner.call(prompt)
         return report
 

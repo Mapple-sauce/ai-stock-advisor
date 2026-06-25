@@ -371,24 +371,20 @@ def score_ma5_stability(ind: dict, mode: str) -> tuple[float, str]:
 #  评分引擎
 # ════════════════════════════════════════════════════════════
 
-def _compute_score(s: dict, ind: dict, mode: str) -> tuple[float, list[str]]:
-    """综合多因子评分 — 参考 Barra 多因子模型
+def _compute_score(s: dict, ind: dict, mode: str, sector: str = "综合") -> tuple[float, list[str]]:
+    """综合多因子评分 — **板块感知版**
 
-    计算流程:
-      1. 对每个因子计算 -1.0 ~ +1.0 的分数
-      2. 乘以因子权重
-      3. 加权求和得到总分 (-100 ~ +100)
-      4. 归一化到 0 ~ 100 输出
+    不同板块使用不同的因子权重矩阵。
+    科技/新能源重趋势动量, 消费/金融重基本面。
     """
     price = s.get("price", 0)
     signals = []
 
-    if mode == SCAN_MODE_LOW:
-        weights = WEIGHTS_LOW
-    elif mode == SCAN_MODE_MOMENTUM:
-        weights = WEIGHTS_MOMENTUM
-    else:
-        return 50, ["涨幅榜模式不下发评分"]
+    # 使用板块专属权重
+    from scanner.sectors import get_sector_weights
+    weights = get_sector_weights(sector, mode)
+    if weights is None:
+        weights = WEIGHTS_LOW if mode == SCAN_MODE_LOW else WEIGHTS_MOMENTUM
 
     # 计算每个因子得分
     factor_scores = {}
@@ -589,9 +585,16 @@ def _score_candidates_batch(stocks: list[dict], mode: str) -> list[dict]:
             if "error" in ind:
                 continue
 
-            score, signals = _compute_score(s, ind, mode)
+            # 板块感知评分
+            try:
+                from scanner.sectors import get_sector
+                sector_name = get_sector(s["code"])
+            except Exception:
+                sector_name = "综合"
+            score, signals = _compute_score(s, ind, mode, sector=sector_name)
+
             results.append({
-                **s, "score": round(score, 1),
+                **s, "score": round(score, 1), "sector": sector_name,
                 "rsi": ind.get("rsi14", "?"),
                 "vol_ratio": ind.get("vol_ratio", "?"),
                 "ma_trend": ind.get("ma_trend", ""),

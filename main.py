@@ -129,6 +129,28 @@ def _do_scan(scan_mode: str):
     send_report(report, f"🔍 AI 市场扫描 - {label}")
 
 
+def run_hunter():
+    """低位挖掘: Hunter Agent 深度分析"""
+    scan_mode = "low_position"
+    from scanner.screener import screen_market
+
+    print("\n" + "█" * 60)
+    print("   💎 AI 低位挖掘 Hunter Agent")
+    print("   [全市场扫雷 → 量化初筛 → AI深度分析 → 精选排名]")
+    print("█" * 60)
+
+    candidates = screen_market(mode=scan_mode, max_candidates=20)
+    if not candidates:
+        print("⚠️ 扫描结果为空")
+        return
+
+    orchestrator = Orchestrator()
+    report = orchestrator.hunter_deep_dive(candidates)
+
+    print(f"\n✅ 低位挖掘完成")
+    send_report(report, "💎 AI 低位挖掘深度报告")
+
+
 def add_holding():
     """添加持仓"""
     if len(sys.argv) < 4:
@@ -180,6 +202,8 @@ def main():
         "低位": lambda: run_scan_with_mode("low_position"),
         "mom": lambda: run_scan_with_mode("momentum"),
         "追高": lambda: run_scan_with_mode("momentum"),
+        "hunt": run_hunter,
+        "挖掘": run_hunter,
         "add": add_holding,
         "添加": add_holding,
         "list": list_holdings,
@@ -192,10 +216,11 @@ def main():
         fn()
     else:
         print(f"未知模式: {mode}")
-        print("用法: python main.py [buy|sell|scan|low|mom|add|list|all]")
-        print("  scan      涨幅榜扫描 (默认)")
-        print("  low       低位潜力股 💎")
-        print("  mom       追高跟强 🔥")
+        print("用法: python main.py [buy|sell|scan|low|mom|hunt|add|list|all]")
+        print("  scan      涨幅榜扫描")
+        print("  low       低位潜力股 (量化筛选)")
+        print("  mom       追高跟强")
+        print("  hunt      低位挖掘 (AI深度分析) 💎 推荐")
         print("  buy       买入分析")
         print("  sell      卖出分析")
 

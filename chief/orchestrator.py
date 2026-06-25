@@ -10,6 +10,7 @@ from agents.fundamental import fundamental_analyst
 from agents.sentiment import sentiment_analyst
 from agents.risk import risk_analyst
 from agents.scanner import market_scanner
+from agents.hunter import hunter_agent, build_hunter_prompt
 from chief import chief_agent
 from data.indicators import compute_indicators
 from data.market import get_realtime_quote, get_kline
@@ -225,6 +226,97 @@ class Orchestrator:
         )
         report = market_scanner.call(prompt)
         return report
+
+    # ──────────────────────────────────────────────
+    #  低位挖掘流程 (Hunter Agent 深度分析)
+    # ──────────────────────────────────────────────
+
+    def hunter_deep_dive(self, candidates: list[dict]) -> str:
+        """Hunter 深度挖掘: 对候选股逐一分析 + 综合排名
+
+        工作流:
+          1. 全市场扫雷 → 量化初筛 (已完成, 由调用方执行)
+          2. AI 深度挖掘 → 对 TOP 10 逐一分析
+          3. 精选排名 → Hunter 输出最终榜单
+        """
+        print(f"\n  🔬 低位挖掘 Agent 开始深度分析...")
+
+        top = sorted(candidates, key=lambda s: s.get("score", 0), reverse=True)[:10]
+        print(f"  📋 选取 TOP {len(top)} 进行深度分析\n")
+
+        deep_reports = []
+        for i, s in enumerate(top, 1):
+            name = s.get("name", "")
+            code = s.get("code", "")
+            print(f"    [{i}/{len(top)}] 🕵️ 分析 {name} ({code})...")
+
+            prompt = build_hunter_prompt(
+                symbol=code, name=name,
+                price=s.get("price", 0), change_pct=s.get("change_pct", 0),
+                ind={
+                    "ma5": s.get("ma5"), "ma10": s.get("ma10"), "ma20": s.get("ma20"),
+                    "ma_trend": s.get("ma_trend"), "rsi14": s.get("rsi"),
+                    "rsi_status": s.get("rsi_status"),
+                    "macd_dif": s.get("macd_dif"), "macd_dea": s.get("macd_dea"),
+                    "macd_hist": s.get("macd_hist"), "macd_bullish": s.get("macd_bullish"),
+                    "macd_golden_cross": s.get("macd_golden_cross"),
+                    "kdj_k": s.get("kdj_k"), "kdj_d": s.get("kdj_d"), "kdj_j": s.get("kdj_j"),
+                    "bb_upper": s.get("bb_upper"), "bb_mid": s.get("bb_mid"),
+                    "bb_lower": s.get("bb_lower"), "price_in_bb": s.get("price_in_bb"),
+                    "vol_ratio": s.get("vol_ratio"), "vol_status": s.get("vol_status"),
+                    "high_20d": s.get("high_20d"), "low_20d": s.get("low_20d"),
+                    "near_20d_high": s.get("near_20d_high"),
+                },
+                signals=s.get("signals", []),
+                turnover=s.get("turnover", 0),
+            )
+
+            try:
+                report = hunter_agent.call(prompt)
+                deep_reports.append((name, code, report))
+                print(f"    ✅ 完成")
+            except Exception as e:
+                print(f"    ❌ 失败: {e}")
+
+        # 汇总报告
+        lines = [
+            f"# 💎 AI 低位挖掘深度报告",
+            f"**日期**: {time.strftime('%Y-%m-%d')}",
+            f"**扫描股票数**: {len(candidates)}",
+            f"**深度分析数**: {len(deep_reports)}",
+            "", "---", "",
+        ]
+
+        # 综合排名
+        summary_prompt = "以下是对各只候选股票的深度分析结果，请对它们进行综合排名：\n\n"
+        for name, code, report in deep_reports:
+            short = (report or "分析失败")[:300].replace("#", "").strip()
+            summary_prompt += f"**{name} ({code})**:\n{short}\n\n"
+
+        summary_prompt += (
+            "请按推荐程度从高到低排序，输出格式:\n"
+            "| 排名 | 股票 | 评级 | 核心逻辑 | 风险收益比 |\n"
+            "|:---:|:---:|:---:|:---|:---:|\n"
+            "| 🥇 | xxx | ⭐⭐⭐ | ... | 好 |\n"
+        )
+
+        print(f"\n  📊 Hunter 综合排名中...")
+        try:
+            ranking = hunter_agent.call(summary_prompt)
+            lines.append("## 📊 最终精选排名\n")
+            lines.append(ranking)
+            lines.append("")
+        except Exception as e:
+            print(f"  ⚠️ 排名生成失败: {e}")
+
+        lines.append("---\n## 📋 详细分析\n")
+        for name, code, report in deep_reports:
+            lines.append(f"### {name} ({code})\n")
+            lines.append(report or "*(分析失败)*")
+            lines.append("---\n")
+
+        lines.append("\n*报告由 AI Hunter Agent 自动生成, 仅供参考*")
+        return "\n".join(lines)
 
 
 # ──────────────────────────────────────────────

@@ -37,7 +37,19 @@ class SentimentAnalyst(BaseAgent):
 **市场情绪**: ...
 
 **综合研判**: [2-3句话总结]
+
+### 输出示例 (请严格按此格式)
+```
+### 舆情评分: 6/10
+
+**热点板块**: AI算力链, 光模块
+**近期利好**: 公司公告称CPO技术取得突破, 获大客户订单
+**近期利空**: 无重大利空
+**市场情绪**: 板块整体活跃, 资金关注度较高
+
+**综合研判**: 舆情偏正面, 有技术突破催化, 板块热度高, 短期情绪面支撑。
+```
 """
 
 
-sentiment_analyst = SentimentAnalyst("sentiment", temperature=0.3)
+sentiment_analyst = SentimentAnalyst("sentiment", temperature=0.1)

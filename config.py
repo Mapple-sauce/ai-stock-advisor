@@ -24,10 +24,6 @@ class Settings:
     risk_model: str = field(default_factory=lambda: os.getenv("RISK_MODEL", ""))
     chief_model: str = field(default_factory=lambda: os.getenv("CHIEF_MODEL", ""))
 
-    # ── Agent 温度 ──
-    agent_temperature: float = field(default_factory=lambda: float(os.getenv("AGENT_TEMPERATURE", "0.3")))
-    chief_temperature: float = field(default_factory=lambda: float(os.getenv("CHIEF_TEMPERATURE", "0.2")))
-
     # ── 通知 ──
     wechat_webhook_url: str = field(default_factory=lambda: os.getenv("WECHAT_WEBHOOK_URL", ""))
 

@@ -44,8 +44,24 @@ class TechnicalAnalyst(BaseAgent):
 **技术形态**: ...
 
 **综合研判**: [2-3句话总结]
+
+### 输出示例 (请严格按此格式)
+```
+### 技术评分: 6/10
+
+**趋势判断**: 多头排列, 上升趋势
+**均线系统**: MA5(15.2) > MA10(14.8) > MA20(14.3), 均线发散向上
+**MACD**: DIF=0.35 DEA=0.28 红柱, 多头持续
+**RSI**: 58.2, 正常区间, 未超买
+**KDJ**: K=62 D=58 J=70, 偏多
+**布林带**: 价格沿中轨上行, 位置适中
+**量价关系**: 量比1.3, 量价配合健康, 温和放量
+**技术形态**: 沿MA5稳步攀升, 未见顶部信号
+
+**综合研判**: 技术面偏多, 短期均线多头排列, MACD红柱持续, 量价配合健康, 可以考虑买入。
+```
 """
 
 
 # 单例
-technical_analyst = TechnicalAnalyst("technical", temperature=0.2)
+technical_analyst = TechnicalAnalyst("technical", temperature=0.1)

@@ -37,7 +37,19 @@ class FundamentalAnalyst(BaseAgent):
 **财务健康**: ...
 
 **综合研判**: [2-3句话总结]
+
+### 输出示例 (请严格按此格式)
+```
+### 基本面评分: 7/10
+
+**估值分析**: PE=18.5, 处于行业中等偏低水平, 估值合理
+**盈利能力**: ROE=15.2%, 毛利率42%, 净利率18%, 盈利能力稳健
+**成长性**: 营收同比+12%, 净利润同比+15%, 增长稳定
+**财务健康**: 资产负债率45%, 现金流充裕
+
+**综合研判**: 基本面稳健, 估值合理, 盈利能力突出, 适合中长期持有。
+```
 """
 
 
-fundamental_analyst = FundamentalAnalyst("fundamental", temperature=0.2)
+fundamental_analyst = FundamentalAnalyst("fundamental", temperature=0.1)

@@ -70,10 +70,25 @@ class HunterAgent(BaseAgent):
 | 🥇 | xxx | ⭐⭐⭐ | ... |
 | 🥈 | xxx | ⭐⭐ | ... |
 ...
+
+### 输出示例
+```
+### 🎯 深度分析: 宁德时代 (300750)
+
+**技术面状态**: 横盘整理
+**下跌原因判断**: 正常回调(约15%)
+**企稳信号**: MACD绿柱缩短, RSI回升, 站上MA5
+**支撑/压力**: 支撑 200 | 压力 235
+**潜在催化剂**: 6月新能源车销量数据发布
+**风险收益比**: 好
+**综合评级**: ⭐⭐⭐
+
+**一句话点评**: 龙头回调到位, 技术面企稳。
+```
 """
 
 
-hunter_agent = HunterAgent("hunter", temperature=0.25)
+hunter_agent = HunterAgent("hunter", temperature=0.1)
 
 
 def build_hunter_prompt(symbol: str, name: str, price: float, change_pct: float,

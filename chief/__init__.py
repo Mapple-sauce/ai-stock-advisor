@@ -138,7 +138,36 @@ class ChiefAgent(BaseAgent):
   - 保护本金是第一原则
 
 重要: 输出必须严格遵循指定的 JSON 格式, 不要添加额外文字。
-"""
+
+### 输出示例 (买入决策)
+```json
+{
+  "final_score": 7,
+  "action": "推荐买入",
+  "confidence": "中",
+  "entry_upper": 15.8,
+  "entry_lower": 15.2,
+  "stop_loss": 14.5,
+  "position_suggestion": "半仓(3-5成)",
+  "time_horizon": "中期(1-4周)",
+  "key_reason": "技术面多头排列, MACD金叉, 基本面估值合理",
+  "risks_to_watch": ["大盘回调", "板块轮动"]
+}
+```
+
+### 输出示例 (卖出决策)
+```json
+{
+  "final_score": 8,
+  "action": "减仓",
+  "confidence": "高",
+  "sell_reason": "MACD死叉, 跌破MA20支撑",
+  "stop_loss_updated": 14.2,
+  "target_price": 16.0,
+  "take_profit_now": false,
+  "risks_to_watch": ["继续下跌"]
+}
+```"""
 
     def decide_buy(self, stock_info: dict, technical: str, fundamental: str,
                    sentiment: str, risk: str) -> dict:
@@ -188,4 +217,4 @@ class ChiefAgent(BaseAgent):
         return self.call_structured(prompt, SELL_DECISION_SCHEMA)
 
 
-chief_agent = ChiefAgent("chief", temperature=settings.chief_temperature)
+chief_agent = ChiefAgent("chief", temperature=0.05)

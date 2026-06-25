@@ -53,4 +53,4 @@ class MarketScanner(BaseAgent):
 """
 
 
-market_scanner = MarketScanner("scanner", temperature=0.3)
+market_scanner = MarketScanner("scanner", temperature=0.1)

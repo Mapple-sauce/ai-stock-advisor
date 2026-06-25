@@ -1,4 +1,4 @@
-name: 🚀 AI Stock Advisor — 手动触发全流程
+name: 🚀 手动触发全流程
 on:
   workflow_dispatch:
     inputs:
@@ -19,8 +19,8 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: 安装依赖

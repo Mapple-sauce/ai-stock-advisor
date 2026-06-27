@@ -196,16 +196,17 @@ def add_holding():
 
 
 def run_optimize():
-    """动态权重优化: P1 优化方案"""
+    """动态权重优化: P1 方案 - 自动寻找最优因子权重"""
     mode = "low_position"
     if len(sys.argv) > 2:
         mode = sys.argv[2]
 
     print("\n" + "█" * 60)
     print("   ⚡ P1 优化方案: 动态权重矩阵")
-    print("   " + "█" * 60 + "\n")
+    print("   扫描最近6个月数据, 搜索20000组权重配置")
+    print("█" * 60 + "\n")
 
-    from backtest.optimizer import find_optimal_weights, score_config
+    from backtest.optimizer import find_optimal_weights
     from scanner.screener import refresh_weights_file
 
     print(f"  模式: {mode}")
@@ -221,93 +222,31 @@ def run_optimize():
     )
 
     if "error" in result:
-        print(f"\n  ❌ 优化失败: {result[\"error\"]}")
+        print(f"\n  ❌ 优化失败: {result['error']}")
         return
 
     print(f"\n  ✅ 优化完成!")
-    print(f"  准确率: {result[\"accuracy_pct\"]}%")
-    print(f"  多空差: {result[\"spread\"]:+.1f}%")
-    print(f"  测试次数: {result[\"total_tests\"]}次")
-    print(f"  买入/回避: {result[\"buy_count\"]}/{result[\"avoid_count\"]}次")
+    print(f"  准确率: {result['accuracy_pct']}%")
+    print(f"  多空差: {result['spread']:+.1f}%")
+    print(f"  测试次数: {result['total_tests']}次")
+    print(f"  买入/回避: {result['buy_count']}/{result['avoid_count']}次")
     print(f"\n  最优权重配置:")
 
     weights = result["weights"]
     for f, (w, name, _) in sorted(weights.items(), key=lambda x: x[1][0], reverse=True):
         print(f"    {f:20s} = {w:.4f}  ({name})")
 
-    # 保存到文件
     saved = refresh_weights_file(mode, weights)
     if saved:
         print(f"\n  ✅ 权重已保存到 weights/{mode}.json")
     else:
         print(f"\n  ⚠️ 权重保存失败, 使用硬编码权重")
 
-    print(f"\n  对比: 旧权重正确率约 61.5%")
-    print(f"        新权重正确率 {result[\"accuracy_pct\"]}%  ({↑
-
-
-def run_optimize():
-    """动态权重优化: P1 方案 - 自动寻找最优因子权重"""
-    mode = "low_position"
-    if len(sys.argv) > 2:
-        mode = sys.argv[2]
-
-    print("
-" + "█" * 60)
-    print("   ⚡ P1 优化方案: 动态权重矩阵")
-    print("   " + "扫描最近6个月数据, 搜索20000组权重配置")
-    print("█" * 60 + "
-")
-
-    from backtest.optimizer import find_optimal_weights
-    from scanner.screener import refresh_weights_file
-
-    print(f"  模式: {mode}")
-    print(f"  样本: 15只龙头股, 最近6个月数据")
-    print(f"  搜索: 20000组随机权重配置
-")
-
-    result = find_optimal_weights(
-        symbols=None,
-        mode=mode,
-        lookback_months=6,
-        hold_days=20,
-        iterations=20000,
-    )
-
-    if "error" in result:
-        print(f"
-  ❌ 优化失败: {result['error']}")
-        return
-
-    print(f"
-  ✅ 优化完成!")
-    print(f"  准确率: {result['accuracy_pct']}%")
-    print(f"  多空差: {result['spread']:+.1f}%")
-    print(f"  测试次数: {result['total_tests']}次")
-    print(f"  买入/回避: {result['buy_count']}/{result['avoid_count']}次")
-    print(f"
-  最优权重配置:")
-
-    weights = result["weights"]
-    for f, (w, name, _) in sorted(weights.items(), key=lambda x: x[1][0], reverse=True):
-        print(f"    {f:20s} = {w:.4f}  ({name})")
-
-    # 保存到文件
-    saved = refresh_weights_file(mode, weights)
-    if saved:
-        print(f"
-  ✅ 权重已保存到 weights/{mode}.json")
-    else:
-        print(f"
-  ⚠️ 权重保存失败, 使用硬编码权重")
-
     old_acc = 61.5
     new_acc = result['accuracy_pct']
     diff = new_acc - old_acc
     arrow = "↑" if diff > 0 else "↓" if diff < 0 else "="
-    print(f"
-  对比: 旧权重正确率 {old_acc}%  →  新权重正确率 {new_acc}%  ({arrow} {abs(diff):.1f}%)")
+    print(f"\n  对比: 旧权重正确率 {old_acc}%  →  新权重正确率 {new_acc}%  ({arrow} {abs(diff):.1f}%)")
 
 
 def run_backtest_mode():

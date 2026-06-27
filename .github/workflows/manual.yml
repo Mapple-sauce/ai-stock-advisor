@@ -18,6 +18,7 @@ on:
           - report
           - optimize
           - analyze
+          - text
       stock_code:
         description: "股票代码 (多个用逗号分隔), 如: 512480,510880,002594,601012"
         required: false
@@ -35,7 +36,7 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
       - name: 安装中文字体
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk 2>&1 | tail -3
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk fonts-wqy-microhei 2>&1 | tail -3
       - name: Run ${{ inputs.mode }}
         run: |
           if [ "${{ inputs.mode }}" = "analyze" ] || [ "${{ inputs.mode }}" = "分析" ]; then
@@ -45,6 +46,12 @@ jobs:
               CODE=$(echo "$STOCK_LIST" | cut -d',' -f1)
             fi
             python main.py analyze "$CODE"
+          elif [ "${{ inputs.mode }}" = "text" ]; then
+            CODE="${{ inputs.stock_code }}"
+            if [ -z "$CODE" ]; then
+              CODE="512480,510880,002594"
+            fi
+            python test_analysis.py $(echo "$CODE" | tr ',' ' ')
           else
             python main.py ${{ inputs.mode }}
           fi

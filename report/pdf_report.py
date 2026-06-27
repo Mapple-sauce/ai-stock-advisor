@@ -7,46 +7,56 @@ from pathlib import Path
 
 from fpdf import FPDF
 
-# ── 简体中文字体路径候选项（按优先级） ──
-_FONT_CANDIDATES = [
-    # 系统预装（Ubuntu fonts-noto-cjk 包）
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
-    "/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
-    # 项目本地
-    lambda: str(Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"),
-]
+# ── 中文字体 ──
+# fpdf2 add_font() 只支持单文件 TTF/OTF（不支持 TTC 合集）
+# CFF 格式 OTF 在 fpdf2 中编码有问题（每个中文前会多出 \x00）
+# 因此优先使用 TrueType 格式的字体
+_LOCAL_DIR = Path(__file__).resolve().parent.parent / "fonts"
+_LOCAL_TTF = _LOCAL_DIR / "NotoSansSC-Regular.ttf"
+_LOCAL_OTF = _LOCAL_DIR / "NotoSansCJKsc-Regular.otf"
 
-_FONT_URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
-_LOCAL_FONT = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"
+# Google Fonts Noto Sans SC (可变 TTF) — 真正的 TrueType 格式
+_TTF_URL = "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+# 备选: NotoSansCJKsc OTF (CFF 格式, fpdf2 可能有兼容问题)
+_OTF_URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
 
 C1 = (25, 55, 109); C2 = (0, 122, 204); CG = (0, 180, 100)
 CR = (220, 60, 60); CY = (255, 180, 0); CGR = (100, 100, 100)
 CLB = (240, 242, 248); CW = (255, 255, 255); CB = (30, 30, 30)
 
 
+def _download_font(url: str, dest: Path) -> bool:
+    """下载字体文件"""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    print(f"  [FONT] 下载字体 -> {dest.name} ...")
+    import urllib.request
+    try:
+        urllib.request.urlretrieve(url, dest)
+        sz = dest.stat().st_size
+        print(f"  [FONT] 完成 ({sz/1024/1024:.1f}MB)")
+        return sz > 100_000
+    except Exception as e:
+        print(f"  [FONT] 下载失败: {e}")
+        return False
+
+
 def _find_font() -> str | None:
-    """查找系统中可用的中文字体路径"""
-    for cand in _FONT_CANDIDATES:
-        path = cand() if callable(cand) else cand
-        if Path(path).exists() and Path(path).stat().st_size > 100_000:
-            print(f"  [FONT] 找到系统字体: {path}")
-            return str(path)
-    # 下载到本地
-    if not _LOCAL_FONT.exists() or _LOCAL_FONT.stat().st_size < 1_000_000:
-        _LOCAL_FONT.parent.mkdir(parents=True, exist_ok=True)
-        print("  [FONT] 下载中文字体 NotoSansCJKsc...")
-        import urllib.request
-        try:
-            urllib.request.urlretrieve(_FONT_URL, _LOCAL_FONT)
-            sz = _LOCAL_FONT.stat().st_size
-            print(f"  [FONT] 下载完成 ({sz/1024/1024:.1f}MB)")
-        except Exception as e:
-            print(f"  [FONT] 下载失败: {e}")
-            return None
-    if _LOCAL_FONT.exists() and _LOCAL_FONT.stat().st_size > 1_000_000:
-        return str(_LOCAL_FONT)
+    """查找可用中文字体，返回字体路径"""
+    # 优先使用 TTF (TrueType) 格式
+    if _LOCAL_TTF.exists() and _LOCAL_TTF.stat().st_size > 100_000:
+        return str(_LOCAL_TTF)
+
+    # 尝试下载 TTF
+    if _download_font(_TTF_URL, _LOCAL_TTF):
+        return str(_LOCAL_TTF)
+
+    # 备选: OTF 格式
+    if _LOCAL_OTF.exists() and _LOCAL_OTF.stat().st_size > 1_000_000:
+        return str(_LOCAL_OTF)
+
+    if _download_font(_OTF_URL, _LOCAL_OTF):
+        return str(_LOCAL_OTF)
+
     return None
 
 
@@ -62,12 +72,22 @@ class StockReport(FPDF):
                 self.add_font("CN", "", font_path, uni=True)
                 self.add_font("CN", "B", font_path, uni=True)
                 self._font = "CN"
-                print(f"  [FONT] 成功加载字体: {font_path}")
+                print(f"  [FONT] ✅ 加载成功: {Path(font_path).name} ({Path(font_path).stat().st_size/1024:.0f}KB)")
             except Exception as e:
-                print(f"  [FONT] 字体加载失败: {e}, 使用英文字体")
+                print(f"  [FONT] ❌ 加载失败 ({Path(font_path).name}): {e}")
+                print(f"  [FONT] 尝试下载备选字体...")
+                # 如果 TTF 失败，尝试 OTF
+                if "ttf" in font_path.lower() and _download_font(_OTF_URL, _LOCAL_OTF):
+                    try:
+                        self.add_font("CN", "", str(_LOCAL_OTF), uni=True)
+                        self.add_font("CN", "B", str(_LOCAL_OTF), uni=True)
+                        self._font = "CN"
+                        return
+                    except Exception as e2:
+                        print(f"  [FONT] ❌ OTF 也失败: {e2}")
                 self._font = "Helvetica"
         else:
-            print("  [FONT] 没有找到中文字体，使用英文字体")
+            print("  [FONT] ❌ 无中文字体可用，使用英文")
             self._font = "Helvetica"
 
     def _ft(self, style="", size=10):
@@ -91,20 +111,23 @@ class StockReport(FPDF):
         self.cell(0, 10, f"生成时间: {now} | 仅供参考", align="C")
 
     def cover(self, title, subtitle=""):
-        self.add_page(); self.ln(50)
+        self.add_page()
+        if self._font != "Helvetica":
+            self.ln(50)
         self.set_font(*self._ft("B", 28)); self.set_text_color(*C1)
         self.cell(0, 15, title, align="C", new_x="LMARGIN", new_y="NEXT")
         if subtitle:
             self.set_font(*self._ft("", 14)); self.set_text_color(*C2)
             self.cell(0, 10, subtitle, align="C", new_x="LMARGIN", new_y="NEXT")
-        self.ln(5)
-        self.set_draw_color(*C2); self.set_line_width(0.5)
-        self.line(60, self.get_y(), 150, self.get_y()); self.ln(10)
-        self.set_font(*self._ft("", 12)); self.set_text_color(*CGR)
-        self.cell(0, 8, f"报告日期: {datetime.date.today().strftime('%Y年%m月%d日')}", align="C", new_x="LMARGIN", new_y="NEXT")
-        self.ln(30)
-        self.set_font(*self._ft("", 8)); self.set_text_color(*CGR)
-        self.multi_cell(0, 5, "免责声明: 本报告由 AI 自动生成，仅供参考，不构成投资建议。", align="C")
+        if self._font != "Helvetica":
+            self.ln(5)
+            self.set_draw_color(*C2); self.set_line_width(0.5)
+            self.line(60, self.get_y(), 150, self.get_y()); self.ln(10)
+            self.set_font(*self._ft("", 12)); self.set_text_color(*CGR)
+            self.cell(0, 8, f"报告日期: {datetime.date.today().strftime('%Y年%m月%d日')}", align="C", new_x="LMARGIN", new_y="NEXT")
+            self.ln(30)
+            self.set_font(*self._ft("", 8)); self.set_text_color(*CGR)
+            self.multi_cell(0, 5, "免责声明: 本报告由 AI 自动生成，仅供参考，不构成投资建议。", align="C")
 
     def h1(self, title):
         self.ln(4)
@@ -150,7 +173,7 @@ class StockReport(FPDF):
 
 
 def validate_content(market_summary, sector_analysis, stock_analysis, market_news, sentiments):
-    """生成前校验数据完整性，标记每个章节是否有数据"""
+    """生成前校验数据完整性"""
     checks = {"市场总览": bool(market_summary and market_summary.get("indices")),
               "板块分析": bool(sector_analysis and len(sector_analysis) > 0),
               "个股评分": bool(stock_analysis and len(stock_analysis) > 0),
@@ -184,20 +207,14 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
     if pdf._font == "Helvetica":
         print("  [WARNING] No Chinese font found, using English")
 
-    # Pre-validation
     print("  [CHECK] Pre-validating content integrity...")
     validate_content(market_summary, sector_analysis, stock_analysis, market_news, sentiments)
 
-    # Cover
     pdf.cover(title="每日策略分析报告", subtitle="AI Stock Advisor")
-
-    # TOC
     pdf.add_page(); pdf.h1("目录")
     for t in ["1. 市场总览", "2. 板块分析", "3. 个股技术评分", "4. 市场舆情", "5. AI 产业链推荐", "6. 机器人产业链推荐", "7. 风险提示"]:
         pdf.set_font(*pdf._ft("", 11)); pdf.set_text_color(*C1)
         pdf.cell(0, 8, "    " + t, new_x="LMARGIN", new_y="NEXT")
-
-    # Section 1
     pdf.add_page(); pdf.h1("1. 市场总览")
     if market_summary:
         idx = market_summary.get("indices", [])
@@ -207,8 +224,6 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
                       [50, 50, 50, 40])
         v = market_summary.get("outlook", "")
         if v: pdf.h2("市场观点"); pdf.p(v)
-
-    # Section 2
     pdf.h1("2. 板块分析")
     if sector_analysis:
         rows = []
@@ -216,8 +231,6 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
             sp = s.get("spread", 0)
             rows.append([s['name'], f'{s.get("score",0):.0f}', f'{sp:+.1f}%', s.get("direction","-"), s.get("view","")[:25]])
         pdf.table(["板块", "评分", "多空差", "方向", "观点"], rows, [35, 25, 30, 30, 70])
-
-    # Section 3
     pdf.add_page(); pdf.h1("3. 个股技术评分")
     if stock_analysis:
         rows = []
@@ -230,44 +243,31 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
         for stk in stock_analysis[:8]:
             sc = stk.get("score",0)
             txt = f"{stk.get('name','')}({stk.get('code','')}): 评分{sc:.0f}/100 | 参考介入{stk.get('entry_ref','-')} | {stk.get('action','观望')}"
-            if stk.get("reason"): txt += " - " + stk['reason']
-            pdf.p_color(txt, CG if sc >= 65 else CB)
-
-    # Section 4
+            if sc >= 65: pdf.p_color(txt, CG)
+            else: pdf.p_color(txt, CB)
     pdf.h1("4. 市场舆情")
-    has_sent = False
-    if market_news:
+    has_news = market_news and len(market_news) > 0
+    has_sent = sentiments and len(sentiments) > 0
+    if has_news:
         pdf.h2("今日要闻")
-        for n in market_news:
-            pdf.p("* " + n.get('title',''))
-    if sentiments:
+        for n in market_news: pdf.p("* " + n.get('title',''))
+    if has_sent:
         pdf.h2("个股舆情")
         for code, sent in list(sentiments.items())[:6]:
-            nm = sent.get("name", code) or code
-            pdf.p(f"* {nm}({code}): 研报{len(sent.get('reports',[]))}篇 | 新闻{len(sent.get('news',[]))}条 | 讨论{len(sent.get('posts',[]))}条")
-            has_sent = True
-    if not has_sent and not market_news:
-        pdf.p("（暂无舆情数据）")
-
-    # Section 5
+            pdf.p(f"* {sent.get('name',code)}({code}): 研报{len(sent.get('reports',[]))}篇 | 新闻{len(sent.get('news',[]))}条")
+    if not has_news and not has_sent: pdf.p("（暂无舆情数据）")
     pdf.add_page(); pdf.h1("5. AI 产业链布局建议")
     ai = [s for s in (stock_analysis or []) if s.get("sector_group") == "AI"]
     if ai:
         pdf.table(["优先级", "标的", "评分", "参考介入", "逻辑"],
-                  [[s.get("priority",""), f"{s.get('name','')}({s.get('code','')})",
-                    f'{s.get("score",0):.0f}/100', s.get("entry_ref","-"), s.get("reason","")[:25]] for s in ai],
+                  [[s.get("priority",""), f"{s.get('name','')}({s.get('code','')})", f'{s.get("score",0):.0f}/100', s.get("entry_ref","-"), s.get("reason","")[:25]] for s in ai],
                   [18, 42, 25, 38, 67])
-
-    # Section 6
     pdf.h1("6. 机器人产业链布局建议")
     robot = [s for s in (stock_analysis or []) if s.get("sector_group") == "Robot"]
     if robot:
         pdf.table(["优先级", "标的", "评分", "参考介入", "逻辑"],
-                  [[s.get("priority",""), f"{s.get('name','')}({s.get('code','')})",
-                    f'{s.get("score",0):.0f}/100', s.get("entry_ref","-"), s.get("reason","")[:25]] for s in robot],
+                  [[s.get("priority",""), f"{s.get('name','')}({s.get('code','')})", f'{s.get("score",0):.0f}/100', s.get("entry_ref","-"), s.get("reason","")[:25]] for s in robot],
                   [18, 42, 25, 38, 67])
-
-    # Section 7
     pdf.add_page(); pdf.h1("7. 风险提示")
     for r in [
         "1. 本报告由 AI 模型自动生成，仅供参考，不构成投资建议。",
@@ -280,7 +280,6 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
         pdf.set_font(*pdf._ft("", 9.5)); pdf.set_text_color(*CGR)
         pdf.cell(0, 8, r, new_x="LMARGIN", new_y="NEXT")
 
-    # Save + validate
     pdf.output(str(filename))
     v = validate_report(str(filename))
     status = "OK" if v["valid"] else "WARN"

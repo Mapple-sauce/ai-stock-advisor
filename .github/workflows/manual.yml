@@ -19,7 +19,7 @@ on:
           - optimize
           - analyze
       stock_code:
-        description: 分析代码 (仅 analyze 模式)
+        description: "股票代码 (多个用逗号分隔), 如: 512480,510880,002594,601012"
         required: false
         default: ""
         type: string
@@ -52,3 +52,9 @@ jobs:
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
           WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
           STOCK_LIST: ${{ secrets.STOCK_LIST }}
+      - name: 上传分析报告
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: reports
+          path: reports/

@@ -106,13 +106,26 @@ class StockReport(FPDF):
         self.line(10, self.get_y(), 200, self.get_y()); self.ln(4)
 
 
+def validate_content(market_summary, sector_analysis, stock_analysis, market_news, sentiments):
+    """生成前校验数据完整性，标记每个章节是否有数据"""
+    checks = {"市场总览": bool(market_summary and market_summary.get("indices")),
+              "板块分析": bool(sector_analysis and len(sector_analysis) > 0),
+              "个股评分": bool(stock_analysis and len(stock_analysis) > 0),
+              "市场舆情": bool(market_news and len(market_news) > 0),
+              "个股舆情": bool(sentiments and len(sentiments) > 0)}
+    missing = [k for k, v in checks.items() if not v]
+    print(f"  [DATA] 有数据: {len([v for v in checks.values() if v])}/5 | 缺失: {', '.join(missing) if missing else '无'}")
+    return checks
+
+
 def validate_report(path_str):
+    """校验 PDF 文件完整性"""
     path = Path(path_str)
     if not path.exists():
         return {"valid": False, "issues": ["文件不存在"], "size_kb": 0}
     sz = path.stat().st_size / 1024
     issues = []
-    if sz < 10: issues.append(f"文件过小({sz:.0f}KB)")
+    if sz < 30: issues.append(f"文件偏小({sz:.0f}KB) — 部分内容可能缺失")
     if sz > 50000: issues.append(f"文件过大({sz:.0f}KB)")
     return {"valid": len(issues) == 0, "issues": issues, "size_kb": round(sz, 1)}
 
@@ -127,6 +140,10 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
     pdf = StockReport()
     if pdf._font == "Helvetica":
         print("  [WARNING] No Chinese font found, using English")
+
+    # Pre-validation: check data completeness before generating PDF
+    print("  [CHECK] Pre-validating content integrity...")
+    validate_content(market_summary, sector_analysis, stock_analysis, market_news, sentiments)
 
     # Cover
     pdf.cover(title="每日策略分析报告", subtitle="AI Stock Advisor")

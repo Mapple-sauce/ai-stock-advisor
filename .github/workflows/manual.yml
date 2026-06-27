@@ -17,6 +17,7 @@ on:
           - hunt
           - report
           - optimize
+          - analyze
       stock_code:
         description: 分析代码 (仅 analyze 模式)
         required: false

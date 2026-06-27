@@ -1,4 +1,4 @@
-name: 🚀 手动触发全流程
+name: Manual Run
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +17,11 @@ on:
           - hunt
           - report
           - optimize
+      stock_code:
+        description: 分析代码 (仅 analyze 模式)
+        required: false
+        default: ""
+        type: string
 
 jobs:
   run:
@@ -26,10 +31,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: 安装依赖
+      - name: Install deps
         run: pip install -r requirements.txt
-      - name: 运行 ${{ inputs.mode }}
-        run: python main.py ${{ inputs.mode }}
+      - name: Run ${{ inputs.mode }}
+        run: |
+          if [ "${{ inputs.mode }}" = "analyze" ] || [ "${{ inputs.mode }}" = "分析" ]; then
+            CODE="${{ inputs.stock_code }}"
+            if [ -z "$CODE" ]; then
+              echo "Using first stock from STOCK_LIST"
+              CODE=$(echo "$STOCK_LIST" | cut -d',' -f1)
+            fi
+            python main.py analyze "$CODE"
+          else
+            python main.py ${{ inputs.mode }}
+          fi
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}

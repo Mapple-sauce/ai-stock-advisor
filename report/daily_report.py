@@ -1,4 +1,4 @@
-"""Daily PDF Report Generator"""
+"""Daily PDF Report Generator — with sentiment aggregation"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import datetime
 from config import settings
 from data.market import get_realtime_quote, get_kline
 from data.indicators import compute_indicators
+from data.sentiment import collect_sentiment, get_market_news_snapshot
 from report.pdf_report import generate_daily_report
 from scanner.sectors import get_sector, get_sector_weighted_score
 
@@ -84,8 +85,25 @@ def run_daily_report(output_dir: str = "reports") -> str:
         stocks.append({"code":code,"name":ref["name"],"price":price,"score":sc,"rsi":rsi,"trend":trend,"signal":signal,"action":action,"entry_ref":ref["entry"],"reason":ref["reason"],"sector_group":ref["group"],"priority":ref["prio"]})
         print(f"    {ref['name']}({code}): {sc:.0f}/100")
 
-    # 4. PDF
-    print("  [4/5] PDF...")
-    pdf = generate_daily_report(market_summary={"indices":indices,"outlook":"Structural divergence. AI chain strong, Robot oversold."}, sector_analysis=sectors, stock_analysis=stocks, output_dir=output_dir)
-    print(f"\n  [5/5] Done! PDF: {pdf}")
+    # 4. Sentiment
+    print("  [4/5] Sentiment...")
+    market_news = get_market_news_snapshot(6)
+    sentiments = {}
+    for code in list(STOCKS.keys())[:6]:
+        sent = collect_sentiment(code, STOCKS[code]["name"], max_sources=2)
+        if sent["total_items"] > 0:
+            sentiments[code] = sent
+    print(f"    collected {len(sentiments)} stock sentiments, {len(market_news)} market news")
+
+    # 5. PDF
+    print("  [5/5] PDF...")
+    pdf = generate_daily_report(
+        market_summary={"indices":indices,"outlook":"Structural divergence. AI chain strong, Robot oversold."},
+        sector_analysis=sectors,
+        stock_analysis=stocks,
+        market_news=market_news,
+        sentiments=sentiments,
+        output_dir=output_dir,
+    )
+    print(f"\n  Done! PDF: {pdf}")
     return pdf

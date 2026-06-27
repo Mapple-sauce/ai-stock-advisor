@@ -65,10 +65,10 @@ def _find_row(df: pd.DataFrame, symbol: str):
 
     # 加 sh/sz 前缀
     if symbol.isdigit():
-        prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
-        match = df[df["代码"] == f"{prefix}{symbol}"]
-        if not match.empty:
-            return match.iloc[0]
+        for prefix in ("sh", "sz"):
+            match = df[df["代码"] == f"{prefix}{symbol}"]
+            if not match.empty:
+                return match.iloc[0]
 
     return None
 
@@ -190,6 +190,6 @@ def _to_baostock_code(symbol: str) -> str:
     if s.startswith(("sh", "sz", "bj")):
         return f"{s[:2]}.{s[2:]}"
     if s.isdigit():
-        prefix = "sh" if s.startswith(("6", "9")) else "sz"
+        prefix = "sh" if s.startswith(("5", "6", "9")) else "sz"
         return f"{prefix}.{s}"
     return s

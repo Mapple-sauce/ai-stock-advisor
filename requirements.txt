@@ -6,3 +6,4 @@ akshare>=1.14.0
 baostock>=0.9.0
 python-dotenv>=1.0.0
 matplotlib>=3.7.0
+fpdf2>=2.7.0

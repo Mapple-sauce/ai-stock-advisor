@@ -7,29 +7,47 @@ from pathlib import Path
 
 from fpdf import FPDF
 
-_FONT_PATH = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"
-_FONT_URL = "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
+# ── 简体中文字体路径候选项（按优先级） ──
+_FONT_CANDIDATES = [
+    # 系统预装（Ubuntu fonts-noto-cjk 包）
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
+    "/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
+    # 项目本地
+    lambda: str(Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"),
+]
+
+_FONT_URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
+_LOCAL_FONT = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"
 
 C1 = (25, 55, 109); C2 = (0, 122, 204); CG = (0, 180, 100)
 CR = (220, 60, 60); CY = (255, 180, 0); CGR = (100, 100, 100)
 CLB = (240, 242, 248); CW = (255, 255, 255); CB = (30, 30, 30)
 
 
-def _ensure_font():
-    """确保中文字体存在，缺失时自动下载"""
-    if _FONT_PATH.exists() and _FONT_PATH.stat().st_size > 1_000_000:
-        return True
-    print("  [FONT] 下载中文字体 NotoSansCJKsc...")
-    import urllib.request
-    _FONT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        urllib.request.urlretrieve(_FONT_URL, _FONT_PATH)
-        sz = _FONT_PATH.stat().st_size
-        print(f"  [FONT] 下载完成 ({sz/1024/1024:.1f}MB)")
-        return sz > 1_000_000
-    except Exception as e:
-        print(f"  [FONT] 下载失败: {e}")
-        return False
+def _find_font() -> str | None:
+    """查找系统中可用的中文字体路径"""
+    for cand in _FONT_CANDIDATES:
+        path = cand() if callable(cand) else cand
+        if Path(path).exists() and Path(path).stat().st_size > 100_000:
+            print(f"  [FONT] 找到系统字体: {path}")
+            return str(path)
+    # 下载到本地
+    if not _LOCAL_FONT.exists() or _LOCAL_FONT.stat().st_size < 1_000_000:
+        _LOCAL_FONT.parent.mkdir(parents=True, exist_ok=True)
+        print("  [FONT] 下载中文字体 NotoSansCJKsc...")
+        import urllib.request
+        try:
+            urllib.request.urlretrieve(_FONT_URL, _LOCAL_FONT)
+            sz = _LOCAL_FONT.stat().st_size
+            print(f"  [FONT] 下载完成 ({sz/1024/1024:.1f}MB)")
+        except Exception as e:
+            print(f"  [FONT] 下载失败: {e}")
+            return None
+    if _LOCAL_FONT.exists() and _LOCAL_FONT.stat().st_size > 1_000_000:
+        return str(_LOCAL_FONT)
+    return None
 
 
 class StockReport(FPDF):
@@ -38,12 +56,18 @@ class StockReport(FPDF):
     def __init__(self):
         super().__init__(orientation="P", unit="mm", format="A4")
         self.set_auto_page_break(auto=True, margin=25)
-        _ensure_font()
-        if _FONT_PATH.exists():
-            self.add_font("CN", "", str(_FONT_PATH), uni=True)
-            self.add_font("CN", "B", str(_FONT_PATH), uni=True)
-            self._font = "CN"
+        font_path = _find_font()
+        if font_path:
+            try:
+                self.add_font("CN", "", font_path, uni=True)
+                self.add_font("CN", "B", font_path, uni=True)
+                self._font = "CN"
+                print(f"  [FONT] 成功加载字体: {font_path}")
+            except Exception as e:
+                print(f"  [FONT] 字体加载失败: {e}, 使用英文字体")
+                self._font = "Helvetica"
         else:
+            print("  [FONT] 没有找到中文字体，使用英文字体")
             self._font = "Helvetica"
 
     def _ft(self, style="", size=10):
@@ -160,7 +184,7 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
     if pdf._font == "Helvetica":
         print("  [WARNING] No Chinese font found, using English")
 
-    # Pre-validation: check data completeness before generating PDF
+    # Pre-validation
     print("  [CHECK] Pre-validating content integrity...")
     validate_content(market_summary, sector_analysis, stock_analysis, market_news, sentiments)
 
@@ -224,7 +248,6 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
             has_sent = True
     if not has_sent and not market_news:
         pdf.p("（暂无舆情数据）")
-    pdf.divider()
 
     # Section 5
     pdf.add_page(); pdf.h1("5. AI 产业链布局建议")

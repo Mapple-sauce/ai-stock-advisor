@@ -24,20 +24,13 @@ import pandas as pd
 # ── 中文字体配置 ──
 _LOCAL_FONT = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"
 _FONT_URL = "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
-_FONT_CANDIDATES = [
-    str(_LOCAL_FONT),
-    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-]
 
 _CHART_DIR = Path(__file__).parent.parent / "reports" / "charts"
 
 
 def _setup_chinese_font():
-    """尝试设置中文字体，缺失时自动下载"""
-    # 本地字体不存在则下载
+    """全局设置 matplotlib 中文字体（对所有文本生效，包括轴标签、图例、标题）"""
+    # 下载字体（如果缺失）
     if not _LOCAL_FONT.exists() or _LOCAL_FONT.stat().st_size < 1_000_000:
         _LOCAL_FONT.parent.mkdir(parents=True, exist_ok=True)
         print("  [FONT] 下载图表中文字体...")
@@ -49,23 +42,41 @@ def _setup_chinese_font():
         except Exception as e:
             print(f"  [FONT] 图表字体下载失败: {e}")
 
-    for fp in _FONT_CANDIDATES:
-        if Path(fp).exists():
+    # 通过 font_manager 注册字体并设为全局默认
+    if _LOCAL_FONT.exists() and _LOCAL_FONT.stat().st_size > 1_000_000:
+        try:
+            import matplotlib.font_manager as fm
+            fm.fontManager.addfont(str(_LOCAL_FONT))
+            # 获取字体族名称
+            fp = fm.FontProperties(fname=str(_LOCAL_FONT))
+            font_name = fp.get_name()
+            # 设置全局默认字体族 + sans-serif 回退链
+            plt.rcParams["font.family"] = "sans-serif"
+            plt.rcParams["font.sans-serif"] = [font_name, "DejaVu Sans", "Arial"]
+            plt.rcParams["axes.unicode_minus"] = False
+            print(f"  [FONT] 已设置全局中文字体: {font_name}")
+            return True
+        except Exception as e:
+            print(f"  [FONT] 注册字体失败: {e}")
+            # 备选方案：直接尝试用 rcParams 指定 Noto Sans CJK
             try:
-                from matplotlib.font_manager import FontProperties
-                return FontProperties(fname=fp)
+                plt.rcParams["font.family"] = "sans-serif"
+                plt.rcParams["font.sans-serif"] = ["Noto Sans CJK SC", "Noto Sans SC", "DejaVu Sans"]
+                plt.rcParams["axes.unicode_minus"] = False
+                print(f"  [FONT] 已通过名称设置中文字体 (fallback)")
+                return True
             except Exception:
-                continue
-    return None
+                pass
+    return False
 
 
-_CN_FONT = _setup_chinese_font()
+_CN_SET = _setup_chinese_font()
 
 
 def _use_cn():
-    """返回是否使用中文的字体属性"""
-    if _CN_FONT:
-        return {"fontproperties": _CN_FONT}
+    """返回是否使用中文的字体属性（备用方案，针对不支持全局的旧版 matplotlib）"""
+    if _CN_SET:
+        return {}
     return {}
 
 

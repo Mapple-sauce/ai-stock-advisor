@@ -9,8 +9,8 @@ jobs:
   daily-report:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@main
+      - uses: actions/setup-python@main
         with:
           python-version: "3.12"
       - name: 安装依赖
@@ -24,7 +24,7 @@ jobs:
           WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
           STOCK_LIST: ${{ secrets.STOCK_LIST }}
       - name: 上传PDF报告
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@main
         with:
           name: daily-report
           path: reports/

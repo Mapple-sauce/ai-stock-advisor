@@ -27,3 +27,7 @@ Thumbs.db
 
 # 报告 PDF 文件
 reports/*.pdf
+
+# 字体文件 (自动下载)
+fonts/*.otf
+fonts/*.ttf

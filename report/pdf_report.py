@@ -8,10 +8,28 @@ from pathlib import Path
 from fpdf import FPDF
 
 _FONT_PATH = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"
+_FONT_URL = "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
 
 C1 = (25, 55, 109); C2 = (0, 122, 204); CG = (0, 180, 100)
 CR = (220, 60, 60); CY = (255, 180, 0); CGR = (100, 100, 100)
 CLB = (240, 242, 248); CW = (255, 255, 255); CB = (30, 30, 30)
+
+
+def _ensure_font():
+    """确保中文字体存在，缺失时自动下载"""
+    if _FONT_PATH.exists() and _FONT_PATH.stat().st_size > 1_000_000:
+        return True
+    print("  [FONT] 下载中文字体 NotoSansCJKsc...")
+    import urllib.request
+    _FONT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        urllib.request.urlretrieve(_FONT_URL, _FONT_PATH)
+        sz = _FONT_PATH.stat().st_size
+        print(f"  [FONT] 下载完成 ({sz/1024/1024:.1f}MB)")
+        return sz > 1_000_000
+    except Exception as e:
+        print(f"  [FONT] 下载失败: {e}")
+        return False
 
 
 class StockReport(FPDF):
@@ -20,6 +38,7 @@ class StockReport(FPDF):
     def __init__(self):
         super().__init__(orientation="P", unit="mm", format="A4")
         self.set_auto_page_break(auto=True, margin=25)
+        _ensure_font()
         if _FONT_PATH.exists():
             self.add_font("CN", "", str(_FONT_PATH), uni=True)
             self.add_font("CN", "B", str(_FONT_PATH), uni=True)

@@ -33,7 +33,11 @@ def get_realtime_quote(symbol: str) -> dict:
         # 匹配股票 (新浪代码带 sh/sz 前缀)
         row = _find_row(df, symbol)
         if row is None:
-            return {"error": f"未找到 {symbol}", "code": symbol}
+            # 兜底: ETF 尝试东方财富数据源
+            if symbol.startswith(("5", "15", "16")):
+                row = _try_etf_spot(symbol)
+            if row is None:
+                return {"error": f"未找到 {symbol}", "code": symbol}
 
         return {
             "code": symbol,
@@ -70,6 +74,28 @@ def _find_row(df: pd.DataFrame, symbol: str):
             if not match.empty:
                 return match.iloc[0]
 
+    return None
+
+
+def _try_etf_spot(symbol: str):
+    """兜底: 东方财富 ETF 实时行情"""
+    try:
+        import akshare as ak
+        df = ak.fund_etf_spot_em()
+        for col in ["代码", "fund_code", "symbol"]:
+            if col in df.columns:
+                s = symbol if not symbol.startswith(("sh", "sz")) else symbol[2:]
+                match = df[df[col] == s]
+                if not match.empty:
+                    row = match.iloc[0]
+                    row["名称"] = str(row.get("fund_name", row.get("名称", "")))
+                    row["最新价"] = float(row.get("最新价", 0))
+                    if row["最新价"] < 0.1:
+                        row["最新价"] = float(row.get("price", row["最新价"]))
+                    row["涨跌幅"] = float(row.get("涨跌幅", row.get("change_pct", 0)))
+                    return row
+    except Exception:
+        pass
     return None
 
 

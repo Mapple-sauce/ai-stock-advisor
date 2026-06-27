@@ -10,7 +10,7 @@ from fpdf import FPDF
 _FONT_PATH = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"
 
 C1 = (25, 55, 109); C2 = (0, 122, 204); CG = (0, 180, 100)
-CR = (220, 60, 60); CGR = (100, 100, 100)
+CR = (220, 60, 60); CY = (255, 180, 0); CGR = (100, 100, 100)
 CLB = (240, 242, 248); CW = (255, 255, 255); CB = (30, 30, 30)
 
 

@@ -16,6 +16,7 @@ on:
           - mom
           - hunt
           - report
+          - optimize
 
 jobs:
   run:

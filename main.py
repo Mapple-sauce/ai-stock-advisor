@@ -194,6 +194,122 @@ def add_holding():
     print(f"✅ 已添加持仓: {h['name']} ({h['symbol']}) 成本 {h['cost_price']} 数量 {h['quantity']}")
 
 
+
+def run_optimize():
+    """动态权重优化: P1 优化方案"""
+    mode = "low_position"
+    if len(sys.argv) > 2:
+        mode = sys.argv[2]
+
+    print("\n" + "█" * 60)
+    print("   ⚡ P1 优化方案: 动态权重矩阵")
+    print("   " + "█" * 60 + "\n")
+
+    from backtest.optimizer import find_optimal_weights, score_config
+    from scanner.screener import refresh_weights_file
+
+    print(f"  模式: {mode}")
+    print(f"  样本: 15只龙头股, 最近6个月数据")
+    print(f"  搜索: 20000组随机权重配置\n")
+
+    result = find_optimal_weights(
+        symbols=None,
+        mode=mode,
+        lookback_months=6,
+        hold_days=20,
+        iterations=20000,
+    )
+
+    if "error" in result:
+        print(f"\n  ❌ 优化失败: {result[\"error\"]}")
+        return
+
+    print(f"\n  ✅ 优化完成!")
+    print(f"  准确率: {result[\"accuracy_pct\"]}%")
+    print(f"  多空差: {result[\"spread\"]:+.1f}%")
+    print(f"  测试次数: {result[\"total_tests\"]}次")
+    print(f"  买入/回避: {result[\"buy_count\"]}/{result[\"avoid_count\"]}次")
+    print(f"\n  最优权重配置:")
+
+    weights = result["weights"]
+    for f, (w, name, _) in sorted(weights.items(), key=lambda x: x[1][0], reverse=True):
+        print(f"    {f:20s} = {w:.4f}  ({name})")
+
+    # 保存到文件
+    saved = refresh_weights_file(mode, weights)
+    if saved:
+        print(f"\n  ✅ 权重已保存到 weights/{mode}.json")
+    else:
+        print(f"\n  ⚠️ 权重保存失败, 使用硬编码权重")
+
+    print(f"\n  对比: 旧权重正确率约 61.5%")
+    print(f"        新权重正确率 {result[\"accuracy_pct\"]}%  ({↑
+
+
+def run_optimize():
+    """动态权重优化: P1 方案 - 自动寻找最优因子权重"""
+    mode = "low_position"
+    if len(sys.argv) > 2:
+        mode = sys.argv[2]
+
+    print("
+" + "█" * 60)
+    print("   ⚡ P1 优化方案: 动态权重矩阵")
+    print("   " + "扫描最近6个月数据, 搜索20000组权重配置")
+    print("█" * 60 + "
+")
+
+    from backtest.optimizer import find_optimal_weights
+    from scanner.screener import refresh_weights_file
+
+    print(f"  模式: {mode}")
+    print(f"  样本: 15只龙头股, 最近6个月数据")
+    print(f"  搜索: 20000组随机权重配置
+")
+
+    result = find_optimal_weights(
+        symbols=None,
+        mode=mode,
+        lookback_months=6,
+        hold_days=20,
+        iterations=20000,
+    )
+
+    if "error" in result:
+        print(f"
+  ❌ 优化失败: {result['error']}")
+        return
+
+    print(f"
+  ✅ 优化完成!")
+    print(f"  准确率: {result['accuracy_pct']}%")
+    print(f"  多空差: {result['spread']:+.1f}%")
+    print(f"  测试次数: {result['total_tests']}次")
+    print(f"  买入/回避: {result['buy_count']}/{result['avoid_count']}次")
+    print(f"
+  最优权重配置:")
+
+    weights = result["weights"]
+    for f, (w, name, _) in sorted(weights.items(), key=lambda x: x[1][0], reverse=True):
+        print(f"    {f:20s} = {w:.4f}  ({name})")
+
+    # 保存到文件
+    saved = refresh_weights_file(mode, weights)
+    if saved:
+        print(f"
+  ✅ 权重已保存到 weights/{mode}.json")
+    else:
+        print(f"
+  ⚠️ 权重保存失败, 使用硬编码权重")
+
+    old_acc = 61.5
+    new_acc = result['accuracy_pct']
+    diff = new_acc - old_acc
+    arrow = "↑" if diff > 0 else "↓" if diff < 0 else "="
+    print(f"
+  对比: 旧权重正确率 {old_acc}%  →  新权重正确率 {new_acc}%  ({arrow} {abs(diff):.1f}%)")
+
+
 def run_backtest_mode():
     """回测验证 (方案一): 单日期回测"""
     from backtest.engine import run_backtest
@@ -260,6 +376,71 @@ def run_backtest_multi():
         print(f"  🔴 需优化 (正确率{accuracy}%, 多空差{diff:+.2f}%)")
 
 
+def run_individual_analysis():
+    """个股深度分析"""
+    if len(sys.argv) < 3:
+        print("\n" + "█" * 60)
+        print("   📋 个股深度分析")
+        print("█" * 60)
+        print("\n用法: python main.py analyze <股票代码>")
+        print("示例:")
+        print("  python main.py analyze 002594    # 比亚迪")
+        print("  python main.py analyze 601012    # 隆基绿能")
+        print("  python main.py analyze 510880    # 红利ETF")
+        print("  python main.py analyze 512480    # 半导体ETF")
+        return
+
+    symbols_raw = sys.argv[2]
+    symbols = symbols_raw.replace("，", ",").split(",")
+
+    for i, symbol in enumerate(symbols, 1):
+        symbol = symbol.strip()
+        print(f"\n{'█'*60}")
+        print(f"   📋 [{i}/{len(symbols)}] 个股深度分析: {symbol}")
+        print(f"{'█'*60}")
+
+        from analysis.analyst import stock_analyst
+        result = stock_analyst.analyze(symbol)
+
+        if result.get("status") == "error":
+            print(f"\n  ❌ 分析失败: {result.get('error', '未知错误')}")
+            continue
+
+        from report.individual_report import generate_individual_report
+        pdf_path = generate_individual_report(result)
+        print(f"\n  ✅ 分析完成: {result.get('name', '')} ({symbol})")
+
+        # 汇总
+        analysis = result.get("analysis", {})
+        if analysis:
+            print(f"  📊 评分: {analysis.get('score', '?')}/10 | "
+                  f"评级: {analysis.get('rating', '?')} | "
+                  f"置信度: {analysis.get('confidence', '?')}")
+
+    print(f"\n{'✅'*10}")
+    print(f"  全部分析完成")
+    print(f"{'✅'*10}\n")
+
+
+def run_monitor():
+    """启动新闻监控"""
+    print("\n" + "█" * 60)
+    print("   🔔 个股新闻监控")
+    print("█" * 60)
+
+    symbols = settings.stock_list or settings.watch_list
+    if not symbols:
+        symbols = ["002594", "601012", "510880", "512480"]
+        print(f"  📌 使用默认监控列表: {', '.join(symbols)}")
+
+    print(f"  📡 监控股票: {', '.join(symbols)}")
+    print(f"  ⏱ 每 60 分钟检查一次")
+
+    from analysis.monitor import NewsMonitor
+    monitor = NewsMonitor()
+    monitor.start_monitoring(symbols)
+
+
 def list_holdings():
     """查看持仓"""
     pm = PortfolioManager()
@@ -303,10 +484,16 @@ def main():
         "btmulti": run_backtest_multi,
         "report": run_report,
         "报告": run_report,
+        "optimize": run_optimize,
+        "优化": run_optimize,
         "add": add_holding,
         "添加": add_holding,
         "list": list_holdings,
         "持仓": list_holdings,
+        "analyze": run_individual_analysis,
+        "分析": run_individual_analysis,
+        "monitor": run_monitor,
+        "监控": run_monitor,
         "all": lambda: [run_scan(), run_buy_analysis(), run_sell_analysis()],
     }
 
@@ -315,16 +502,18 @@ def main():
         fn()
     else:
         print(f"未知模式: {mode}")
-        print("用法: python main.py [buy|sell|scan|low|mom|hunt|add|list|all]")
-        print("  scan      涨幅榜扫描")
-        print("  low       低位潜力股 (量化筛选)")
-        print("  mom       追高跟强")
-        print("  hunt      低位挖掘 (AI深度分析) 💎")
-        print("  report    生成每日PDF报告 📄")
-        print("  buy       买入分析")
-        print("  sell      卖出分析")
-        print("  backtest  回测验证")
-        print("  btmulti   多日期综合回测")
+        print("用法: python main.py [command]")
+        print("  scan [mode]  市场扫描 (low/mom/top_gainers)")
+        print("  low          低位潜力股 (量化筛选)")
+        print("  mom          追高跟强")
+        print("  hunt         低位挖掘 (AI深度分析) 💎")
+        print("  buy          买入分析")
+        print("  sell         卖出分析")
+        print("  analyze <code>  个股深度分析 (新) 📋")
+        print("  monitor      新闻监控 (新) 🔔")
+        print("  report       生成每日PDF报告 📄")
+        print("  backtest     回测验证")
+        print("  btmulti      多日期综合回测")
 
 
 if __name__ == "__main__":

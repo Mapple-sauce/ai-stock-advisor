@@ -301,3 +301,196 @@ def _to_bs_code(symbol: str) -> str:
     if s.isdigit():
         return f"{'sh' if s.startswith(('6', '9')) else 'sz'}.{s}"
     return s
+
+
+def find_optimal_weights(
+    symbols: list[str] | None = None,
+    mode: str = "low_position",
+    lookback_months: int = 6,
+    hold_days: int = 20,
+    iterations: int = 20000,
+) -> dict:
+    """自动寻优：在最近N个月的数据上找到最优权重组合
+
+    算法:
+      1. 筛选最近 N 个月的回测日期
+      2. 随机生成 20000 组权重配置 (Dirichlet 分布)
+      3. 用 score_config() 评分选出最优权重
+      4. 返回最优权重 + 准确率 + 多空差
+
+    Returns:
+        {"weights": {因子: (w, name, note), ...},
+         "accuracy_pct": 准确率,
+         "spread": 多空差,
+         "total_tests": 测试次数}
+    """
+    if symbols is None:
+        symbols = TEST_POOL[:10]
+
+    # 筛选最近 N 个月的日期
+    cutoff = datetime.date.today()
+    cutoff = cutoff.replace(day=1)
+    for _ in range(lookback_months):
+        cutoff -= datetime.timedelta(days=30)
+    cutoff_str = cutoff.strftime("%Y-%m-%d")
+
+    recent_dates = [d for d in TEST_DATES if d >= cutoff_str][:8]
+    if len(recent_dates) < 3:
+        recent_dates = TEST_DATES[-6:]  # 兜底: 用最近6个
+    
+    weights_keys = [
+        "ma_trend", "macd_signal", "rsi_position", "volume_ratio",
+        "bb_position", "kdj_signal", "price_position", "near_high_low",
+        "daily_change", "ma5_stability",
+    ]
+    factor_names = {
+        "ma_trend": "均线趋势", "macd_signal": "MACD信号", "rsi_position": "RSI位置",
+        "volume_ratio": "量价关系", "bb_position": "布林位置", "kdj_signal": "KDJ信号",
+        "price_position": "价格位置", "near_high_low": "高低位置",
+        "daily_change": "当日涨幅", "ma5_stability": "MA5支撑",
+    }
+
+    # 加载数据
+    _ensure_data(symbols)
+
+    # 预计算所有股票在所有日期上的因子分数 (加速)
+    cache = {}  # {(sym, date): factor_scores_dict}
+    for sym in symbols:
+        for date in recent_dates:
+            kdf = _kline_for(sym, date)
+            if kdf is None:
+                continue
+            ind = compute_indicators(kdf)
+            if "error" in ind:
+                continue
+            entry = float(kdf.iloc[-1]["收盘"])
+            fut = _total_return(sym, date, hold_days)
+            if fut is None:
+                continue
+            # 预计算因子分
+            from scanner.screener import (
+                score_ma_trend, score_macd_signal, score_rsi_position,
+                score_volume_ratio, score_bb_position, score_kdj_signal,
+                score_price_position, score_near_high_low, score_daily_change,
+                score_ma5_stability,
+            )
+            fs = {
+                "ma_trend": score_ma_trend(ind, mode)[0],
+                "macd_signal": score_macd_signal(ind, mode)[0],
+                "rsi_position": score_rsi_position(ind, mode)[0],
+                "volume_ratio": score_volume_ratio(ind, mode)[0],
+                "bb_position": score_bb_position(ind, mode)[0],
+                "kdj_signal": score_kdj_signal(ind, mode)[0],
+                "price_position": score_price_position(ind, mode, entry)[0],
+                "near_high_low": score_near_high_low(ind, mode)[0],
+                "daily_change": score_daily_change(ind, {"price": entry, "change_pct": 0}, mode)[0],
+                "ma5_stability": score_ma5_stability(ind, mode)[0],
+            }
+            cache[(sym, date)] = (fs, fut["return_pct"])
+
+    if not cache:
+        return {"error": "No data available"}
+
+    print(f"   已预计算 {len(cache)} 组因子数据, 开始搜索最优配置...")
+
+    # 随机搜索: Dirichlet 分布生成随机权重
+    import random
+    seed = 42
+    random.seed(seed)
+
+    best_score = -999
+    best_weights = None
+    best_result = None
+    total_data = list(cache.values())
+
+    REPORT_INTERVAL = max(1, iterations // 20)
+
+    for i in range(iterations):
+        # 用 Dirichlet 分布生成随机权重 (所有权重和为1)
+        raw_ws = [random.expovariate(1) for _ in weights_keys]
+        total_w = sum(raw_ws)
+        ws = [w / total_w for w in raw_ws]
+
+        # 计算评分
+        correct = 0
+        total = 0
+        buy_ret, avoid_ret = [], []
+        for fs, ret in total_data:
+            tw = 0
+            ws_total = 0
+            for w, key in zip(ws, weights_keys):
+                if key in fs:
+                    ws_total += w * fs[key] * 100
+                    tw += w
+            raw = (ws_total / tw + 50) if tw else 50
+            score = max(0, min(100, 100 - raw))
+
+            if score >= 68:
+                act = "买入"
+            elif score >= 58:
+                act = "建议关注"
+            elif score >= 45:
+                act = "观望"
+            else:
+                act = "回避"
+
+            total += 1
+            if (act in ("买入", "建议关注") and ret > 0) or (act == "回避" and ret < 0) or (act == "观望" and abs(ret) < 3):
+                correct += 1
+
+        acc = correct / total * 100
+        # 简单评分: 准确率 - 50 + 多空差/5
+        sc = (acc - 50)
+
+        if sc > best_score:
+            best_score = sc
+            best_weights = {k: (w, factor_names.get(k, k), "") for k, w in zip(weights_keys, ws)}
+            best_result = {"accuracy_pct": round(acc, 1), "total_tests": total}
+
+        if (i + 1) % REPORT_INTERVAL == 0:
+            print(f"     进度 {i+1}/{iterations}  当前最优: 准确率 {best_result['accuracy_pct']}%")
+
+    # 用最优权重跑一次完整回测
+    final_weights = {f: (w, name, note) for f, (w, name, note) in best_weights.items()}
+    
+    # 验证
+    verify_total = 0
+    verify_correct = 0
+    verify_buy, verify_avoid = [], []
+    for fs, ret in total_data:
+        tw = ws_v = 0
+        for f, (w, _, _) in final_weights.items():
+            if f in fs:
+                ws_v += w * fs[f] * 100
+                tw += w
+        raw = (ws_v / tw + 50) if tw else 50
+        score = max(0, min(100, 100 - raw))
+        
+        if score >= 68: act = "买入"
+        elif score >= 58: act = "建议关注"
+        elif score >= 45: act = "观望"
+        else: act = "回避"
+        
+        verify_total += 1
+        if (act in ("买入","建议关注") and ret > 0) or (act == "回避" and ret < 0) or (act == "观望" and abs(ret) < 3):
+            verify_correct += 1
+        if act in ("买入","建议关注"):
+            verify_buy.append(ret)
+        elif act == "回避":
+            verify_avoid.append(ret)
+
+    ba = sum(verify_buy)/len(verify_buy) if verify_buy else 0
+    aa = sum(verify_avoid)/len(verify_avoid) if verify_avoid else 0
+
+    return {
+        "weights": final_weights,
+        "accuracy_pct": round(verify_correct / verify_total * 100, 1),
+        "spread": round(ba - aa, 2),
+        "total_tests": verify_total,
+        "buy_count": len(verify_buy),
+        "avoid_count": len(verify_avoid),
+        "buy_avg_return": round(ba, 2),
+        "avoid_avg_return": round(aa, 2),
+        "lookback_months": lookback_months,
+        "iterations": iterations,
+    }

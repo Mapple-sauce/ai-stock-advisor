@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from config import settings
@@ -21,6 +23,77 @@ from config import settings
 SCAN_MODE_LOW = "low_position"      # 低位潜力股
 SCAN_MODE_MOMENTUM = "momentum"     # 追高跟强
 SCAN_MODE_TOPS = "top_gainers"      # 涨幅榜
+
+# ════════════════════════════════════════════════════════════
+#  动态权重矩阵 (P1 优化方案)
+# ════════════════════════════════════════════════════════════
+
+_WEIGHT_CACHE: dict[str, dict | None] = {"low_position": None, "momentum": None}
+_WEIGHT_CACHE_TIME: dict[str, float] = {"low_position": 0, "momentum": 0}
+_WEIGHTS_DIR = Path(__file__).resolve().parent.parent / "weights"
+
+# 权重缓存有效期 (秒): 默认 7 天
+_WEIGHT_TTL = 7 * 24 * 3600
+
+
+def _load_dynamic_weights(mode: str) -> dict | None:
+    """从 weights/ 目录加载动态生成的权重文件"""
+    weight_file = _WEIGHTS_DIR / f"{mode}.json"
+    if not weight_file.exists():
+        return None
+
+    import time
+    mtime = weight_file.stat().st_mtime
+    if time.time() - mtime > _WEIGHT_TTL:
+        return None  # 过期了
+
+    try:
+        data = json.loads(weight_file.read_text(encoding="utf-8"))
+        weights = data.get("weights")
+        if weights and len(weights) >= 8:
+            print(f"  📦 使用动态权重 (文件: {weight_file.name})")
+            return weights
+    except Exception:
+        pass
+    return None
+
+
+def get_dynamic_weights(mode: str) -> dict | None:
+    """获取权重，优先使用动态权重，失败时回退到固定权重"""
+    if _WEIGHT_CACHE[mode] is not None:
+        return _WEIGHT_CACHE[mode]
+
+    # 尝试从文件加载
+    dyn = _load_dynamic_weights(mode)
+    if dyn is not None:
+        _WEIGHT_CACHE[mode] = dyn
+        return dyn
+
+    return None
+
+
+def refresh_weights_file(mode: str, weights_dict: dict) -> bool:
+    """保存动态权重到文件"""
+    _WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
+    weight_file = _WEIGHTS_DIR / f"{mode}.json"
+
+    try:
+        import datetime as dt
+        data = {
+            "mode": mode,
+            "generated_at": dt.datetime.now().isoformat(),
+            "weights": weights_dict,
+        }
+        weight_file.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        # 更新缓存
+        _WEIGHT_CACHE[mode] = weights_dict
+        return True
+    except Exception as e:
+        print(f"  ⚠️ 保存权重失败: {e}")
+        return False
 
 # ════════════════════════════════════════════════════════════
 #  多因子权重矩阵 (Barra CNE6 本土化版)
@@ -380,11 +453,17 @@ def _compute_score(s: dict, ind: dict, mode: str, sector: str = "综合") -> tup
     price = s.get("price", 0)
     signals = []
 
-    # 使用板块专属权重
+    # 使用板块专属权重 (优先动态权重)
     from scanner.sectors import get_sector_weights
     weights = get_sector_weights(sector, mode)
+
     if weights is None:
-        weights = WEIGHTS_LOW if mode == SCAN_MODE_LOW else WEIGHTS_MOMENTUM
+        # 尝试使用动态全局权重
+        dyn = get_dynamic_weights(mode)
+        if dyn is not None:
+            weights = dyn
+        else:
+            weights = WEIGHTS_LOW if mode == SCAN_MODE_LOW else WEIGHTS_MOMENTUM
 
     # 计算每个因子得分
     factor_scores = {}

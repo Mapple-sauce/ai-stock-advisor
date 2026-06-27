@@ -22,19 +22,33 @@ import numpy as np
 import pandas as pd
 
 # ── 中文字体配置 ──
+_LOCAL_FONT = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-Regular.otf"
+_FONT_URL = "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
 _FONT_CANDIDATES = [
-    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",      # 文泉驿
+    str(_LOCAL_FONT),
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",   # 英文字体兜底
 ]
 
 _CHART_DIR = Path(__file__).parent.parent / "reports" / "charts"
 
 
 def _setup_chinese_font():
-    """尝试设置中文字体，如果都不存在则用英文"""
+    """尝试设置中文字体，缺失时自动下载"""
+    # 本地字体不存在则下载
+    if not _LOCAL_FONT.exists() or _LOCAL_FONT.stat().st_size < 1_000_000:
+        _LOCAL_FONT.parent.mkdir(parents=True, exist_ok=True)
+        print("  [FONT] 下载图表中文字体...")
+        try:
+            import urllib.request
+            urllib.request.urlretrieve(_FONT_URL, _LOCAL_FONT)
+            sz = _LOCAL_FONT.stat().st_size
+            print(f"  [FONT] 图表字体下载完成 ({sz/1024/1024:.1f}MB)")
+        except Exception as e:
+            print(f"  [FONT] 图表字体下载失败: {e}")
+
     for fp in _FONT_CANDIDATES:
         if Path(fp).exists():
             try:

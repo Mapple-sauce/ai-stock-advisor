@@ -1,24 +1,12 @@
-name: 🚀 手动触发全流程
+name: 📊 每日收盘PDF报告
 on:
+  schedule:
+    # 交易日 09:00 UTC = 17:00 北京时间 (收盘后)
+    - cron: "0 9 * * 1-5"
   workflow_dispatch:
-    inputs:
-      mode:
-        description: 运行模式
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - buy
-          - sell
-          - scan
-          - low
-          - mom
-          - hunt
-          - report
 
 jobs:
-  run:
+  daily-report:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,12 +14,17 @@ jobs:
         with:
           python-version: "3.12"
       - name: 安装依赖
-        run: pip install -r requirements.txt
-      - name: 运行 ${{ inputs.mode }}
-        run: python main.py ${{ inputs.mode }}
+        run: pip install -r requirements.txt fpdf2
+      - name: 生成每日PDF报告
+        run: python main.py report
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
           WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
           STOCK_LIST: ${{ secrets.STOCK_LIST }}
+      - name: 上传PDF报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report
+          path: reports/

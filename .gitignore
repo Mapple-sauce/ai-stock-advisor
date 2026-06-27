@@ -24,3 +24,6 @@ Thumbs.db
 
 # 日志
 *.log
+
+# 报告 PDF 文件
+reports/*.pdf

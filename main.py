@@ -129,6 +129,34 @@ def _do_scan(scan_mode: str):
     send_report(report, f"🔍 AI 市场扫描 - {label}")
 
 
+def run_report():
+    """生成每日PDF报告"""
+    from report.daily_report import run_daily_report
+
+    output_dir = "reports"
+    if len(sys.argv) > 2:
+        output_dir = sys.argv[2]
+
+    print(f"\n{'█'*60}")
+    print(f"   📊 生成每日 PDF 分析报告")
+    print(f"{'█'*60}\n")
+
+    pdf_path = run_daily_report(output_dir=output_dir)
+
+    from report.notifier import send_wechat_markdown
+    import datetime as dt
+    send_wechat_markdown(
+        f"## 📊 每日收盘分析报告已生成\n\n"
+        f"**日期**: {dt.date.today()}\n\n"
+        f"📄 文件: `{pdf_path}`\n\n"
+        f"包含: 市场总览 / 板块分析 / 个股评分 / AI链 / 机器人链\n\n"
+        f"> 请查看仓库 `reports/` 目录获取完整 PDF"
+    )
+
+    print(f"\n✅ PDF 报告已生成: {pdf_path}")
+    return pdf_path
+
+
 def run_hunter():
     """低位挖掘: Hunter Agent 深度分析"""
     scan_mode = "low_position"
@@ -273,6 +301,8 @@ def main():
         "backtest": run_backtest_mode,
         "bt": run_backtest_mode,
         "btmulti": run_backtest_multi,
+        "report": run_report,
+        "报告": run_report,
         "add": add_holding,
         "添加": add_holding,
         "list": list_holdings,
@@ -289,10 +319,11 @@ def main():
         print("  scan      涨幅榜扫描")
         print("  low       低位潜力股 (量化筛选)")
         print("  mom       追高跟强")
-        print("  hunt      低位挖掘 (AI深度分析) 💎 推荐")
+        print("  hunt      低位挖掘 (AI深度分析) 💎")
+        print("  report    生成每日PDF报告 📄")
         print("  buy       买入分析")
         print("  sell      卖出分析")
-        print("  backtest  回测验证 (方案一)")
+        print("  backtest  回测验证")
         print("  btmulti   多日期综合回测")
 
 

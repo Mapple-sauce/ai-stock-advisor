@@ -327,8 +327,8 @@ def run_individual_analysis():
         print("  python main.py analyze 601012    # 隆基绿能")
         print("  python main.py analyze 510880    # 红利ETF")
         print("  python main.py analyze 512480    # 半导体ETF")
-    print("  # 逗号分隔, 一次分析多个:")
-    print("  python main.py analyze 512480,510880,516360,002594,601012")
+        print("  # 逗号分隔, 一次分析多个:")
+        print("  python main.py analyze 512480,510880,516360,002594,601012")
         return
 
     symbols_raw = sys.argv[2]

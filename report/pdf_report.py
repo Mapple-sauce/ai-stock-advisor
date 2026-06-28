@@ -1,4 +1,10 @@
-"""PDF 报告生成器 —— 中文版，含内容校验"""
+"""PDF 报告生成器 —— 中文版，含内容校验
+
+字体策略（按优先级）:
+  1. 系统 wqy-microhei.ttc (apt install fonts-wqy-microhei)
+  2. 系统 NotoSansCJK OTF/TTC (apt install fonts-noto-cjk)
+  3. 下载静态 TTF 兜底 (Google Fonts API)
+"""
 
 from __future__ import annotations
 
@@ -7,17 +13,22 @@ from pathlib import Path
 
 from fpdf import FPDF
 
-# ── 中文字体 ──
-# fpdf2 add_font() 只支持单文件 TTF/OTF（不支持 TTC 合集）
-# CFF 格式 OTF 在 fpdf2 中编码有问题（每个中文前会多出 \x00）
-# 因此优先使用 TrueType 格式的字体
+# ── 中文字体搜索路径（按优先级） ──
+_SYS_FONTS = [
+    # 文泉驿微米黑 (TTC, fpdf2 2.7+ 支持)
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    # Noto CJK (TTC 合集)
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    # Noto CJK SC (CFF OTF)
+    "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
+]
+
 _LOCAL_DIR = Path(__file__).resolve().parent.parent / "fonts"
-_LOCAL_TTF = _LOCAL_DIR / "NotoSansSC-Regular.ttf"
 _LOCAL_OTF = _LOCAL_DIR / "NotoSansCJKsc-Regular.otf"
 
-# Google Fonts Noto Sans SC (可变 TTF) — 真正的 TrueType 格式
-_TTF_URL = "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
-# 备选: NotoSansCJKsc OTF (CFF 格式, fpdf2 可能有兼容问题)
+# 兜底下载: CFF OTF (fpdf2 2.7.2+ 对 CFF OTF 编码已修复)
 _OTF_URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
 
 C1 = (25, 55, 109); C2 = (0, 122, 204); CG = (0, 180, 100)
@@ -42,22 +53,32 @@ def _download_font(url: str, dest: Path) -> bool:
 
 def _find_font() -> str | None:
     """查找可用中文字体，返回字体路径"""
-    # 优先使用 TTF (TrueType) 格式
-    if _LOCAL_TTF.exists() and _LOCAL_TTF.stat().st_size > 100_000:
-        return str(_LOCAL_TTF)
+    # 1. 扫描系统字体
+    for fp in _SYS_FONTS:
+        p = Path(fp)
+        if p.exists() and p.stat().st_size > 50_000:
+            print(f"  [FONT] 找到系统字体: {p.name} ({p.stat().st_size/1024:.0f}KB)")
+            return str(p)
 
-    # 尝试下载 TTF
-    if _download_font(_TTF_URL, _LOCAL_TTF):
-        return str(_LOCAL_TTF)
-
-    # 备选: OTF 格式
-    if _LOCAL_OTF.exists() and _LOCAL_OTF.stat().st_size > 1_000_000:
-        return str(_LOCAL_OTF)
-
+    # 2. 尝试下载 OTF
     if _download_font(_OTF_URL, _LOCAL_OTF):
         return str(_LOCAL_OTF)
 
     return None
+
+
+def _load_font(pdf: FPDF, font_path: str) -> bool:
+    """尝试用 fpdf2 加载字体，返回是否成功"""
+    try:
+        pdf.add_font("CN", "", font_path, uni=True)
+        pdf.add_font("CN", "B", font_path, uni=True)
+        ext = Path(font_path).suffix.lower()
+        sz = Path(font_path).stat().st_size / 1024
+        print(f"  [FONT] ✅ 加载成功: {Path(font_path).name} ({sz:.0f}KB)")
+        return True
+    except Exception as e:
+        print(f"  [FONT] ❌ 加载失败 ({Path(font_path).name}): {e}")
+        return False
 
 
 class StockReport(FPDF):
@@ -67,27 +88,10 @@ class StockReport(FPDF):
         super().__init__(orientation="P", unit="mm", format="A4")
         self.set_auto_page_break(auto=True, margin=25)
         font_path = _find_font()
-        if font_path:
-            try:
-                self.add_font("CN", "", font_path, uni=True)
-                self.add_font("CN", "B", font_path, uni=True)
-                self._font = "CN"
-                print(f"  [FONT] ✅ 加载成功: {Path(font_path).name} ({Path(font_path).stat().st_size/1024:.0f}KB)")
-            except Exception as e:
-                print(f"  [FONT] ❌ 加载失败 ({Path(font_path).name}): {e}")
-                print(f"  [FONT] 尝试下载备选字体...")
-                # 如果 TTF 失败，尝试 OTF
-                if "ttf" in font_path.lower() and _download_font(_OTF_URL, _LOCAL_OTF):
-                    try:
-                        self.add_font("CN", "", str(_LOCAL_OTF), uni=True)
-                        self.add_font("CN", "B", str(_LOCAL_OTF), uni=True)
-                        self._font = "CN"
-                        return
-                    except Exception as e2:
-                        print(f"  [FONT] ❌ OTF 也失败: {e2}")
-                self._font = "Helvetica"
+        if font_path and _load_font(self, font_path):
+            self._font = "CN"
         else:
-            print("  [FONT] ❌ 无中文字体可用，使用英文")
+            print("  [FONT] ⚠️ 无中文字体可用，使用英文")
             self._font = "Helvetica"
 
     def _ft(self, style="", size=10):
@@ -212,7 +216,8 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
 
     pdf.cover(title="每日策略分析报告", subtitle="AI Stock Advisor")
     pdf.add_page(); pdf.h1("目录")
-    for t in ["1. 市场总览", "2. 板块分析", "3. 个股技术评分", "4. 市场舆情", "5. AI 产业链推荐", "6. 机器人产业链推荐", "7. 风险提示"]:
+    for t in ["1. 市场总览", "2. 板块分析", "3. 个股技术评分", "4. 市场舆情",
+              "5. AI 产业链推荐", "6. 机器人产业链推荐", "7. 风险提示"]:
         pdf.set_font(*pdf._ft("", 11)); pdf.set_text_color(*C1)
         pdf.cell(0, 8, "    " + t, new_x="LMARGIN", new_y="NEXT")
     pdf.add_page(); pdf.h1("1. 市场总览")
@@ -226,25 +231,19 @@ def generate_daily_report(market_summary=None, sector_analysis=None, stock_analy
         if v: pdf.h2("市场观点"); pdf.p(v)
     pdf.h1("2. 板块分析")
     if sector_analysis:
-        rows = []
-        for s in sector_analysis:
-            sp = s.get("spread", 0)
-            rows.append([s['name'], f'{s.get("score",0):.0f}', f'{sp:+.1f}%', s.get("direction","-"), s.get("view","")[:25]])
+        rows = [[s['name'], f'{s.get("score",0):.0f}', f'{s.get("spread",0):+.1f}%', s.get("direction","-"), s.get("view","")[:25]] for s in sector_analysis]
         pdf.table(["板块", "评分", "多空差", "方向", "观点"], rows, [35, 25, 30, 30, 70])
     pdf.add_page(); pdf.h1("3. 个股技术评分")
     if stock_analysis:
-        rows = []
-        for stk in stock_analysis:
-            rows.append([stk.get('name',''), stk.get("code",""),
-                         f'{stk.get("price",0):.2f}', f'{stk.get("score",0):.0f}/100',
-                         stk.get("action","-"), f'{stk.get("rsi",0):.1f}'])
+        rows = [[stk.get('name',''), stk.get("code",""),
+                 f'{stk.get("price",0):.2f}', f'{stk.get("score",0):.0f}/100',
+                 stk.get("action","-"), f'{stk.get("rsi",0):.1f}'] for stk in stock_analysis]
         pdf.table(["名称", "代码", "现价", "评分", "建议", "RSI"], rows, [35, 28, 28, 28, 30, 28])
         pdf.h2("买卖参考")
         for stk in stock_analysis[:8]:
             sc = stk.get("score",0)
             txt = f"{stk.get('name','')}({stk.get('code','')}): 评分{sc:.0f}/100 | 参考介入{stk.get('entry_ref','-')} | {stk.get('action','观望')}"
-            if sc >= 65: pdf.p_color(txt, CG)
-            else: pdf.p_color(txt, CB)
+            pdf.p_color(txt, CG if sc >= 65 else CB)
     pdf.h1("4. 市场舆情")
     has_news = market_news and len(market_news) > 0
     has_sent = sentiments and len(sentiments) > 0

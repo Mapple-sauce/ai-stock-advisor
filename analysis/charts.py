@@ -26,6 +26,8 @@ _LOCAL_FONT = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKsc-
 _FONT_URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
 # 系统字体路径（安装 fonts-noto-cjk 后可用）
 _SYS_FONTS = [
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",

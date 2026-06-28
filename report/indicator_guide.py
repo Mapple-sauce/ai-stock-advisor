@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from report.pdf_report import StockReport, C1, C2, CG, CR, CY, CGR, CLB, CW, CB
 
 
-def generate_indicator_guide(output_dir: str = "reports") -> str:
+def generate_indicator_guide(output_dir: str = "reports/guide") -> str:
     """生成指标参考手册 PDF"""
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)

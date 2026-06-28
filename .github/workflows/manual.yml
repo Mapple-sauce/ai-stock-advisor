@@ -19,6 +19,7 @@ on:
           - optimize
           - analyze
           - text
+          - guide
       stock_code:
         description: "股票代码 (多个用逗号分隔), 如: 512480,510880,002594,601012"
         required: false

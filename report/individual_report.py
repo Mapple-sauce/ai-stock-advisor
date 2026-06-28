@@ -8,6 +8,8 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
+import numpy as np
+
 from report.pdf_report import StockReport, C1, C2, CG, CR, CY, CGR, CLB, CW, CB
 
 _MAX_CHART_WIDTH = 175
@@ -34,6 +36,10 @@ def generate_individual_report(result: dict, output_dir: str = "reports") -> str
         title=f"{name} ({symbol})",
         subtitle="个股深度分析报告 — AI Stock Advisor",
     )
+    pdf.ln(-15)
+    pdf.set_font(*pdf._ft("", 8))
+    pdf.set_text_color(*CGR)
+    pdf.cell(0, 6, "📖 指标不懂？见配套手册: 投资指标参考手册.pdf", align="C", new_x="LMARGIN", new_y="NEXT")
 
     # ── 目录 ──
     pdf.add_page()
@@ -250,7 +256,7 @@ def _add_ai_analysis(pdf: StockReport, result: dict):
 
 
 def _add_investment_advice(pdf: StockReport, result: dict):
-    """投资建议"""
+    """投资建议 + 价格预测 + 买卖点"""
     analysis = result.get("analysis", {})
     metrics = result.get("metrics", {})
 
@@ -264,6 +270,9 @@ def _add_investment_advice(pdf: StockReport, result: dict):
 
     rating_color = CG if rating in ("强烈推荐", "推荐买入") else CY if rating == "中性观望" else CR
     pdf.p_color(f"投资评级: {rating}  (评分: {score}/10, 置信度: {confidence})", rating_color)
+
+    # ── 价格预测 ──
+    _add_price_prediction(pdf, result)
 
     if theme:
         pdf.h2("核心投资逻辑")
@@ -325,6 +334,82 @@ def _generate_error_report(result: dict, filename: Path):
     pdf.p_color(f"分析失败: {result.get('error', '未知错误')}", CR)
     pdf.output(str(filename))
     print(f"\n  ⚠️ 错误报告已保存: {filename}")
+
+
+def _add_price_prediction(pdf: StockReport, result: dict):
+    """基于历史波动率的统计价格预测 + 买卖点建议"""
+    price = result.get("price", 0)
+    metrics = result.get("metrics", {})
+    volatility = metrics.get("volatility_1y", 30)
+    analysis = result.get("analysis", {})
+    levels = analysis.get("key_levels", {})
+
+    if not price or float(price) <= 0:
+        return
+
+    price_f = float(price)
+    daily_vol = (volatility / 100) / np.sqrt(252) if volatility else 0.03
+
+    def simulate(days):
+        np.random.seed(42)
+        paths = np.zeros((5000, days + 1))
+        paths[:, 0] = price_f
+        for d in range(days):
+            paths[:, d + 1] = paths[:, d] * (1 + np.random.normal(0, daily_vol, 5000))
+        f = paths[:, -1]
+        return {"median": float(np.median(f)), "p25": float(np.percentile(f, 25)),
+                "p75": float(np.percentile(f, 75))}
+
+    pred_1w = simulate(5)
+    pred_1m = simulate(21)
+
+    pdf.h2("📈 价格预测区间（波动率模型）")
+    pdf.p("基于历史波动率的统计模拟，非精确预测。")
+
+    for period, p in [("未来 1 周", pred_1w), ("未来 1 月", pred_1m)]:
+        pdf.p(f"  {period}: {p['p25']:.2f} ~ {p['median']:.2f} ~ {p['p75']:.2f} 元")
+        pdf.p(f"  中位预期: {p['median']:.2f} 元")
+
+    pdf.h2("💰 买卖参考建议")
+    score = float(analysis.get("score", 5))
+    support = levels.get("support", "")
+    resistance = levels.get("resistance", "")
+    stop_loss = levels.get("stop_loss", "")
+
+    buy_high = pred_1w["median"] * 0.98
+    sell_low = pred_1w["median"] * 1.02
+
+    if score >= 6:
+        pdf.p_color(f"  🟢 买入区间: 不高于 {buy_high:.2f} 元", CG)
+        pdf.p_color(f"  🔴 卖出区间: 不低于 {sell_low:.2f} 元", CR)
+    else:
+        pdf.p_color(f"  🟡 当前评分偏低({score}/10), 建议观望", CY)
+        if buy_high > price_f * 0.95:
+            pdf.p(f"  若想介入, 建议等回落到 {price_f*0.95:.2f} 元以下")
+
+    if support: pdf.p(f"  📊 参考支撑: {support}")
+    if resistance: pdf.p(f"  📊 参考阻力: {resistance}")
+    if stop_loss: pdf.p_color(f"  ⛔ 止损位: {stop_loss}", CR)
+
+    pdf.h2("📋 策略建议")
+    is_oversold = isinstance(metrics.get("return_1m"), (int, float)) and metrics["return_1m"] < -15
+    if score >= 7:
+        pdf.p_color("  当前策略: 积极布局 ✅", CG)
+        pdf.p("  评分较高，建议逢低分批建仓，分 2-3 次买入")
+        pdf.p("  持有周期: 中线 1-3 个月")
+        pdf.p_color("  建议仓位: 半仓~7成", CY)
+    elif score >= 5:
+        pdf.p_color("  当前策略: 中性观望 🟡", CY)
+        pdf.p("  评分中等，方向不明，等待评分升至 7+ 或跌至超卖区")
+        pdf.p_color("  建议仓位: 轻仓~半仓", CY)
+    elif is_oversold:
+        pdf.p_color("  当前策略: 左侧关注 ⚠️", CY)
+        pdf.p("  已超跌，可能是底部区域，但需严格止损")
+        pdf.p_color("  建议仓位: 1~2成试探仓", CR)
+    else:
+        pdf.p_color("  当前策略: 回避 🔴", CR)
+        pdf.p("  技术面较弱，不建议买入，持有者注意止损")
+        pdf.p_color("  建议仓位: 空仓观望", CR)
 
 
 def _draw_score_bar(pdf: StockReport, label: str, score: int, max_score: int = 100):

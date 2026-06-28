@@ -433,6 +433,7 @@ def main():
         "持仓": list_holdings,
         "analyze": run_individual_analysis,
         "分析": run_individual_analysis,
+        "guide": lambda: __import__("report.indicator_guide", fromlist=[""]).generate_indicator_guide(),
         "monitor": run_monitor,
         "监控": run_monitor,
         "all": lambda: [run_scan(), run_buy_analysis(), run_sell_analysis()],

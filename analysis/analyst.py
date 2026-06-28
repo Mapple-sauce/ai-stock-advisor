@@ -384,9 +384,11 @@ class StockAnalyst(BaseAgent):
             supports = sr.get("supports", [])
             resistances = sr.get("resistances", [])
             if supports:
-                lines.append(f"支撑位: {', '.join(f'{s[\"name\"]}={s[\"price\"]}' for s in supports)}")
+                items = [f"{s['name']}={s['price']}" for s in supports]
+                lines.append(f"支撑位: {', '.join(items)}")
             if resistances:
-                lines.append(f"阻力位: {', '.join(f'{r[\"name\"]}={r[\"price\"]}' for r in resistances)}")
+                items = [f"{r['name']}={r['price']}" for r in resistances]
+                lines.append(f"阻力位: {', '.join(items)}")
             lines.append("")
 
         # 资金流向

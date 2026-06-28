@@ -119,7 +119,7 @@ def generate_indicator_guide(output_dir: str = "reports") -> str:
     p("  🔄 股价新低但 RSI 没新低 → 底背离（买入信号）")
 
     pdf.divider()
-    pdf.p_color("💡 小白速记：RSI < 20 是"便宜区"（但不代表马上涨），RSI > 80 是"贵了区"（但不代表马上跌）。极端值要警惕。", CY)
+    pdf.p_color('💡 小白速记：RSI < 20 是「便宜区」（但不代表马上涨），RSI > 80 是「贵了区」（但不代表马上跌）。极端值要警惕。', CY)
 
     # ═══════════════ 5. KDJ ═══════════════
     pdf.add_page()
@@ -160,7 +160,7 @@ def generate_indicator_guide(output_dir: str = "reports") -> str:
     p("  🎯 价格在中轨上方 → 偏多；在中轨下方 → 偏空")
 
     pdf.divider()
-    pdf.p_color("💡 小白速记：布林带像一条"跑道"，价格在跑道内跑。碰到上轨别追高，碰到下轨别杀跌。缩口意味着要变盘了。", CY)
+    pdf.p_color('💡 小白速记：布林带像一条「跑道」，价格在跑道内跑。碰到上轨别追高，碰到下轨别杀跌。缩口意味着要变盘了。', CY)
 
     # ═══════════════ 7. 成交量 ═══════════════
     pdf.add_page()
@@ -197,7 +197,7 @@ def generate_indicator_guide(output_dir: str = "reports") -> str:
     p("  📏 远离前低 < 5% → 接近支撑位，关注是否能守住")
 
     pdf.divider()
-    pdf.p_color("💡 小白速记：在底部附近买（但不是最低点），在顶部附近卖（但不是最高点）。追求"鱼身"而非"鱼头鱼尾"。", CY)
+    pdf.p_color('💡 小白速记：在底部附近买（但不是最低点），在顶部附近卖（但不是最高点）。追求「鱼身」而非「鱼头鱼尾」。', CY)
 
     # ═══════════════ 9. 回撤 ═══════════════
     pdf.add_page()
@@ -219,7 +219,7 @@ def generate_indicator_guide(output_dir: str = "reports") -> str:
     p("    • 回撤 < -20% 时如果基本面没变坏，是较好的布局机会")
 
     pdf.divider()
-    pdf.p_color("💡 小白速记：回撤不是亏损，是"从最高点跌了多少"。好股票大跌之后往往是机会，但前提是它确实是好股票。", CY)
+    pdf.p_color('💡 小白速记：回撤不是亏损，是「从最高点跌了多少」。好股票大跌之后往往是机会，但前提是它确实是好股票。', CY)
 
     # ═══════════════ 10. 夏普比率 ═══════════════
     pdf.add_page()
@@ -238,7 +238,7 @@ def generate_indicator_guide(output_dir: str = "reports") -> str:
     p("  如果一个策略 Sharpe > 1，已经非常优秀了。")
 
     pdf.divider()
-    pdf.p_color("💡 小白速记：夏普比率就像"性价比"——同样赚 10%，波动越小（越稳）的夏普比率越高。两个股票都赚 10%，买夏普比率高的那个。", CY)
+    pdf.p_color('💡 小白速记：夏普比率就像「性价比」——同样赚 10%，波动越小（越稳）的夏普比率越高。两个股票都赚 10%，买夏普比率高的那个。', CY)
 
     # ═══════════════ 11. 盈亏比 ═══════════════
     pdf.add_page()
@@ -256,7 +256,7 @@ def generate_indicator_guide(output_dir: str = "reports") -> str:
     p("")
     p("  ❌ 常见误区：追求高胜率")
     p("  胜率高不代表能赚钱——如果每次赚 1% 但亏一次亏 20%")
-    p("  最终还是会亏钱。关键是"小亏大赚"。")
+    p('  最终还是会亏钱。关键是"小亏大赚"。')
 
     pdf.divider()
     pdf.p_color("💡 小白速记：不需要每次都对。错的时候少亏，对的时候多赚，长期就能赚钱。这是职业交易员和散户的核心区别。", CY)

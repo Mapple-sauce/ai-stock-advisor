@@ -51,8 +51,10 @@ def generate_individual_report(result: dict, output_dir: str = "reports") -> str
         "4. 技术指标分析",
         "5. 最大回撤分析",
         "6. AI 综合研判",
-        "7. 投资建议",
-        "8. 风险提示",
+        "7. 行业与供应链分析",
+        "8. 财报深度分析",
+        "9. 投资建议",
+        "10. 风险提示",
     ]:
         pdf.set_font(*pdf._ft("", 11))
         pdf.set_text_color(*C1)
@@ -94,12 +96,22 @@ def generate_individual_report(result: dict, output_dir: str = "reports") -> str
     pdf.h1("6. AI 综合研判 AI Analysis")
     _add_ai_analysis(pdf, result)
 
-    # ── 7 ──
-    pdf.h1("7. 投资建议 Investment Recommendation")
+    # ── 7: 行业与供应链分析 ──
+    pdf.add_page()
+    pdf.h1("7. 行业与供应链分析 Industry & Supply Chain")
+    _add_industry_analysis(pdf, result)
+
+    # ── 8: 财报深度分析 ──
+    pdf.h1("8. 财报深度分析 Financial Deep Dive")
+    _add_financial_deep_dive(pdf, result)
+
+    # ── 9 ──
+    pdf.add_page()
+    pdf.h1("9. 投资建议 Investment Recommendation")
     _add_investment_advice(pdf, result)
 
-    # ── 8 ──
-    pdf.h1("8. 风险提示 Risk Disclaimer")
+    # ── 10 ──
+    pdf.h1("10. 风险提示 Risk Disclaimer")
     _add_disclaimer(pdf)
 
     pdf.output(str(filename))
@@ -117,7 +129,6 @@ def _add_metrics_table(pdf: StockReport, result: dict):
         pdf.p("指标数据不可用")
         return
 
-    # 两列布局: 指标+数值 | 指标+数值
     pdf.set_font(*pdf._ft("B", 9))
     pdf.set_fill_color(*C1)
     pdf.set_text_color(*CW)
@@ -238,8 +249,12 @@ def _add_ai_analysis(pdf: StockReport, result: dict):
         pdf.p("AI 分析数据不可用")
         return
 
-    score = analysis.get("score", 5) * 10  # 转成百分制
-    _draw_score_bar(pdf, "综合评分", int(score))
+    # score is now 1-100 (percentile)
+    score = analysis.get("score", 50)
+    if isinstance(score, (int, float)):
+        _draw_score_bar(pdf, "综合评分", int(score))
+    else:
+        _draw_score_bar(pdf, "综合评分", 50)
 
     for section, key in [
         ("核心观点", "summary"),
@@ -255,13 +270,150 @@ def _add_ai_analysis(pdf: StockReport, result: dict):
             pdf.p(text)
 
 
+def _add_industry_analysis(pdf: StockReport, result: dict):
+    """行业与供应链分析"""
+    sector = result.get("sector", "")
+    sector_data = result.get("sector_performance", {})
+    ranking = result.get("industry_ranking", {})
+    supply_chain = result.get("supply_chain_context", {})
+
+    # 板块总览
+    if sector:
+        pdf.h2(f"所属板块: {sector}")
+        if "error" not in sector_data:
+            pdf.p(f"  近1日: {sector_data.get('change_1d', '?')}% | "
+                  f"成交额: {sector_data.get('volume', '?')}亿 | "
+                  f"上涨/下跌: {sector_data.get('leader_count', '?')}/{sector_data.get('laggard_count', '?')}")
+            if sector_data.get("top_gainers"):
+                gainers = ", ".join(f"{s['name']}({s['change_pct']:+.1f}%)" for s in sector_data["top_gainers"][:3])
+                pdf.p(f"  板块领涨: {gainers}")
+        pdf.p("")
+
+    # 行业排名
+    if ranking and ranking.get("total_peers", 0) > 0:
+        pdf.h2("行业排名")
+        pdf.p(f"  可比公司: {ranking['total_peers']}家")
+        pdf.p(f"  市值排名: {ranking.get('market_cap_rank', 'N/A')} (行业中位数市值 {ranking.get('market_cap_median', 0)/1e8:.1f}亿)")
+        pdf.p(f"  PE排名: {ranking.get('pe_rank', 'N/A')} (行业中位数PE {ranking.get('pe_median', '?')})")
+        pdf.p("")
+
+    # 板块分析AI报告
+    analysis_sector = result.get("analysis_sector")
+    if analysis_sector:
+        pdf.h2("7a. 行业板块分析")
+        pdf.p(analysis_sector[:1000])  # 截取避免过长
+
+    # 行业地位报告
+    analysis_position = result.get("analysis_position")
+    if analysis_position:
+        pdf.h2("7b. 行业地位分析")
+        pdf.p(analysis_position[:1000])
+
+    # 供应链报告
+    analysis_supply = result.get("analysis_supply_chain")
+    if analysis_supply:
+        pdf.h2("7c. 供应链分析")
+        pdf.p(analysis_supply[:1000])
+
+    if not any([analysis_sector, analysis_position, analysis_supply]):
+        pdf.p("行业分析数据暂不可用")
+
+
+def _add_financial_deep_dive(pdf: StockReport, result: dict):
+    """财报深度分析"""
+    financial = result.get("financial", {})
+    if "error" in financial or not financial:
+        pdf.p("财报数据暂不可用")
+        return
+
+    # 当前指标
+    pdf.h2("最新财务指标")
+    items = [
+        ("营业收入", f"{financial.get('revenue', 0)/1e8:.1f}亿" if financial.get('revenue') else "N/A"),
+        ("营收同比", f"{financial.get('revenue_yoy', 'N/A')}%"),
+        ("净利润", f"{financial.get('net_profit', 0)/1e8:.1f}亿" if financial.get('net_profit') else "N/A"),
+        ("净利润同比", f"{financial.get('profit_yoy', 'N/A')}%"),
+    ]
+    if financial.get("roe"):
+        items.append(("ROE", f"{financial['roe']}%"))
+    if financial.get("debt_ratio"):
+        items.append(("资产负债率", f"{financial['debt_ratio']}%"))
+    if financial.get("operating_cashflow"):
+        items.append(("经营现金流", f"{financial['operating_cashflow']/1e8:.1f}亿"))
+    if financial.get("rd_ratio"):
+        items.append(("研发占比", f"{financial['rd_ratio']}%"))
+
+    # 2列显示
+    pdf.set_font(*pdf._ft("B", 9))
+    pdf.set_fill_color(*C1)
+    pdf.set_text_color(*CW)
+    col_w = [40, 55, 40, 55]
+    for i, h in enumerate(["指标", "数值", "指标", "数值"]):
+        pdf.cell(col_w[i], 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    pdf.set_font(*pdf._ft("", 8.5))
+    for row_idx in range(0, len(items), 2):
+        pdf.set_fill_color(*CLB) if (row_idx // 2) % 2 == 0 else pdf.set_fill_color(*CW)
+        pdf.set_text_color(*CB)
+        for j in range(2):
+            idx = row_idx + j
+            if idx < len(items):
+                pdf.cell(col_w[0], 6, items[idx][0], border=1, fill=True, align="C")
+                pdf.cell(col_w[1], 6, str(items[idx][1]), border=1, fill=True, align="C")
+            else:
+                pdf.cell(col_w[0] + col_w[1], 6, "", border=1, fill=True, align="C")
+        pdf.ln()
+    pdf.ln(4)
+
+    # 近4个季度趋势
+    quarters = financial.get("quarters", [])
+    if len(quarters) >= 2:
+        pdf.h2("近4个季度营收与利润趋势")
+        pdf.table(
+            ["报告期", "营收同比", "利润同比", "毛利率", "净利率"],
+            [
+                [
+                    q.get("report_date", "")[-7:],
+                    f"{q.get('revenue_yoy', 0):+.1f}%",
+                    f"{q.get('profit_yoy', 0):+.1f}%",
+                    f"{q.get('gross_margin', 0):.1f}%",
+                    f"{q.get('net_margin', 0):.1f}%",
+                ]
+                for q in quarters
+            ],
+            [38, 38, 38, 38, 38],
+        )
+
+        # 趋势判断
+        rev_trends = [q.get("revenue_yoy", 0) for q in quarters]
+        profit_trends = [q.get("profit_yoy", 0) for q in quarters]
+        avg_rev = sum(rev_trends) / len(rev_trends)
+        avg_profit = sum(profit_trends) / len(profit_trends)
+
+        if avg_rev > 15 and avg_profit > 15:
+            pdf.p_color("  📈 营收和利润持续高增长 (>15%)，成长性优秀", CG)
+        elif avg_rev > 5 and avg_profit > 5:
+            pdf.p_color("  📈 营收和利润稳步增长，经营状况良好", CG)
+        elif avg_rev < -5 and avg_profit < -5:
+            pdf.p_color("  📉 营收和利润双降，需警惕基本面恶化", CR)
+        elif avg_profit < avg_rev:
+            pdf.p_color("  🟡 利润增速低于营收增速，关注利润率变化", CY)
+        else:
+            pdf.p_color("  🟡 业绩增长平稳，关注后续季度变化", CY)
+
+    # 报告日期
+    if financial.get("report_date"):
+        pdf.p(f"  数据截止: {financial['report_date']}")
+
+
 def _add_investment_advice(pdf: StockReport, result: dict):
     """投资建议 + 价格预测 + 买卖点"""
     analysis = result.get("analysis", {})
     metrics = result.get("metrics", {})
 
     rating = analysis.get("rating", "中性观望")
-    score = analysis.get("score", 5)
+    score = analysis.get("score", 50)
     confidence = analysis.get("confidence", "中")
     theme = analysis.get("investment_theme", "")
     position = analysis.get("position_suggestion", "")
@@ -269,7 +421,7 @@ def _add_investment_advice(pdf: StockReport, result: dict):
     risks = analysis.get("risks_to_watch", [])
 
     rating_color = CG if rating in ("强烈推荐", "推荐买入") else CY if rating == "中性观望" else CR
-    pdf.p_color(f"投资评级: {rating}  (评分: {score}/10, 置信度: {confidence})", rating_color)
+    pdf.p_color(f"投资评级: {rating}  (评分: {score}/100, 置信度: {confidence})", rating_color)
 
     # ── 价格预测 ──
     _add_price_prediction(pdf, result)
@@ -368,10 +520,9 @@ def _add_price_prediction(pdf: StockReport, result: dict):
 
     for period, p in [("未来 1 周", pred_1w), ("未来 1 月", pred_1m)]:
         pdf.p(f"  {period}: {p['p25']:.2f} ~ {p['median']:.2f} ~ {p['p75']:.2f} 元")
-        pdf.p(f"  中位预期: {p['median']:.2f} 元")
 
     pdf.h2("💰 买卖参考建议")
-    score = float(analysis.get("score", 5))
+    score = float(analysis.get("score", 50))
     support = levels.get("support", "")
     resistance = levels.get("resistance", "")
     stop_loss = levels.get("stop_loss", "")
@@ -379,11 +530,11 @@ def _add_price_prediction(pdf: StockReport, result: dict):
     buy_high = pred_1w["median"] * 0.98
     sell_low = pred_1w["median"] * 1.02
 
-    if score >= 6:
+    if score >= 65:
         pdf.p_color(f"  🟢 买入区间: 不高于 {buy_high:.2f} 元", CG)
         pdf.p_color(f"  🔴 卖出区间: 不低于 {sell_low:.2f} 元", CR)
     else:
-        pdf.p_color(f"  🟡 当前评分偏低({score}/10), 建议观望", CY)
+        pdf.p_color(f"  🟡 当前评分偏低({score:.0f}/100), 建议观望", CY)
         if buy_high > price_f * 0.95:
             pdf.p(f"  若想介入, 建议等回落到 {price_f*0.95:.2f} 元以下")
 
@@ -393,14 +544,14 @@ def _add_price_prediction(pdf: StockReport, result: dict):
 
     pdf.h2("📋 策略建议")
     is_oversold = isinstance(metrics.get("return_1m"), (int, float)) and metrics["return_1m"] < -15
-    if score >= 7:
+    if score >= 70:
         pdf.p_color("  当前策略: 积极布局 ✅", CG)
         pdf.p("  评分较高，建议逢低分批建仓，分 2-3 次买入")
         pdf.p("  持有周期: 中线 1-3 个月")
         pdf.p_color("  建议仓位: 半仓~7成", CY)
-    elif score >= 5:
+    elif score >= 50:
         pdf.p_color("  当前策略: 中性观望 🟡", CY)
-        pdf.p("  评分中等，方向不明，等待评分升至 7+ 或跌至超卖区")
+        pdf.p("  评分中等，方向不明，等待评分升至 70+ 或跌至超卖区")
         pdf.p_color("  建议仓位: 轻仓~半仓", CY)
     elif is_oversold:
         pdf.p_color("  当前策略: 左侧关注 ⚠️", CY)
@@ -413,7 +564,7 @@ def _add_price_prediction(pdf: StockReport, result: dict):
 
 
 def _draw_score_bar(pdf: StockReport, label: str, score: int, max_score: int = 100):
-    """绘制简易评分条"""
+    """绘制简易评分条（百分制）"""
     pdf.ln(4)
     pdf.set_font(*pdf._ft("B", 10))
     pdf.set_text_color(*CB)

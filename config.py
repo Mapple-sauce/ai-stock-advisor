@@ -23,6 +23,9 @@ class Settings:
     sentiment_model: str = field(default_factory=lambda: os.getenv("SENTIMENT_MODEL", ""))
     risk_model: str = field(default_factory=lambda: os.getenv("RISK_MODEL", ""))
     chief_model: str = field(default_factory=lambda: os.getenv("CHIEF_MODEL", ""))
+    sector_model: str = field(default_factory=lambda: os.getenv("SECTOR_MODEL", ""))
+    industry_position_model: str = field(default_factory=lambda: os.getenv("INDUSTRY_POSITION_MODEL", ""))
+    supply_chain_model: str = field(default_factory=lambda: os.getenv("SUPPLY_CHAIN_MODEL", ""))
 
     # ── 通知 ──
     wechat_webhook_url: str = field(default_factory=lambda: os.getenv("WECHAT_WEBHOOK_URL", ""))

@@ -135,6 +135,8 @@ _SECTOR_WEIGHTS_MOMENTUM: dict[str, dict] = {
 }
 
 _industry_cache: dict[str, str] | None = None
+# 扩展缓存: code -> (industry_code, industry_name)
+_industry_detail_cache: dict[str, tuple[str, str]] | None = None
 
 
 def get_sector(symbol: str) -> str:
@@ -148,6 +150,17 @@ def get_sector(symbol: str) -> str:
             if prefix in SECTOR_MAP:
                 return SECTOR_MAP[prefix]
     return "综合"
+
+
+def get_industry_name(symbol: str) -> str:
+    """返回股票的中文行业名称，如 '酒、饮料和精制茶制造业'"""
+    global _industry_detail_cache
+    if _industry_detail_cache is None:
+        _load_industries()
+    code = _normalize_code(symbol)
+    if code in _industry_detail_cache:
+        return _industry_detail_cache[code][1]
+    return ""
 
 
 def get_sector_weights(sector: str, mode: str) -> dict | None:
@@ -206,8 +219,9 @@ def _normalize_code(symbol: str) -> str:
 
 
 def _load_industries():
-    global _industry_cache
+    global _industry_cache, _industry_detail_cache
     _industry_cache = {}
+    _industry_detail_cache = {}
     try:
         import baostock as bs
         import pandas as pd
@@ -221,7 +235,9 @@ def _load_industries():
         for _, row in df.iterrows():
             code = str(row.get("code", "")).strip()
             industry = str(row.get("industry", "")).strip()
+            industry_name = str(row.get("industryName", row.get("industry_name", ""))).strip()
             if code and industry:
                 _industry_cache[code] = industry
+                _industry_detail_cache[code] = (industry, industry_name)
     except Exception as e:
         print(f"  ⚠️ 行业分类加载失败: {e}")

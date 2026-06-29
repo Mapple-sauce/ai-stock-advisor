@@ -221,6 +221,34 @@ python -m report.indicator_guide             # 生成指标参考手册
 
 使用 DeepSeek API，分析 5 只股票（4 个 Agent 并行）约 ¥0.15 元，每日自动运行约 ¥0.3 元。
 
+## ⚡ GitHub Actions 工作流
+
+### 手动触发 (`manual.yml`)
+进入 **Actions → Manual Run → Run workflow**，选择模式：
+
+| 模式 | stock_code 参数 | 输出 |
+|------|----------------|------|
+| `analyze` | `512480,510880,002594,601012`（逗号分隔） | `reports/` 下的个股 PDF + 图表 |
+| `guide` | 不需要 | `reports/guide/` 下的指标参考手册 PDF |
+| `text` | `512480,510880,002594`（纯文本快速排错） | `reports/` 下的 TXT 文件 |
+| `report` | 不需要 | 每日收盘 PDF 报告 |
+| `scan` / `low` / `mom` | 不需要 | 终端输出（在日志中查看） |
+| `hunt` | 不需要 | 终端输出 |
+| `optimize` | 不需要 | 权重优化结果 |
+
+> `stock_code` 支持沪市（6/5/9开头）和深市（0/3开头）代码，ETF 代码自动识别。
+
+### 定时触发 (`daily_report.yml`)
+- 每个交易日 **17:00 北京时间** 自动生成每日收盘 PDF 报告
+- 报告上传到 Actions 的 Artifacts 中
+
+### 运行结果
+每次运行完成后，在 Actions 运行结果页面的底部 **Artifacts** 区域：
+- `reports` → 个股分析 PDF + 图表 PNG
+- `daily-report` → 每日收盘 PDF 报告
+
+点击即可下载 ZIP 文件。
+
 ## 📜 数据源
 
 | 数据 | 来源 | 费用 |
